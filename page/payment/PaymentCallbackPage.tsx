@@ -4,7 +4,13 @@ import React, { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { verifyPayment } from "@/services/payment";
-import { isPaymentSuccessful, buildFailedPaymentUrl } from "@/lib/payment/utils";
+import { getEnrollmentStatus } from "@/services/researcher";
+import {
+    isPaymentSuccessful,
+    buildFailedPaymentUrl,
+    getOpportunityEnrollContext,
+    clearOpportunityEnrollContext,
+} from "@/lib/payment/utils";
 
 const PaymentCallbackPage = () => {
     const router = useRouter();
@@ -24,6 +30,7 @@ const PaymentCallbackPage = () => {
         const runVerify = async () => {
             try {
                 if (callbackStatus === "failed") {
+                    clearOpportunityEnrollContext();
                     router.replace(
                         buildFailedPaymentUrl({
                             id: paymentId,
@@ -33,6 +40,53 @@ const PaymentCallbackPage = () => {
                     return;
                 }
 
+                // ── Check if this came from an opportunity enrollment ──────────
+                const opportunityCtx = getOpportunityEnrollContext();
+                if (opportunityCtx) {
+                    clearOpportunityEnrollContext();
+                    setMessage("Confirming your enrollment…");
+
+                    // Poll enrollment status a few times
+                    let attempts = 0;
+                    const poll = async () => {
+                        attempts++;
+                        const res: any = await getEnrollmentStatus(opportunityCtx.opportunity_id);
+                        const status = res?.data?.status;
+
+                        if (status === "enrolled") {
+                            const chatId = res?.data?.chat_id;
+                            router.replace(
+                                chatId
+                                    ? `/researcher-dashboard/conversation?chat_id=${chatId}`
+                                    : `/researchopportunities/${opportunityCtx.opportunity_id}`
+                            );
+                            return;
+                        }
+
+                        if (status === "failed") {
+                            router.replace(
+                                buildFailedPaymentUrl({
+                                    id: paymentId,
+                                    message: "Enrollment payment was not confirmed.",
+                                })
+                            );
+                            return;
+                        }
+
+                        // Pending — retry up to 6 times (30s total)
+                        if (attempts < 6) {
+                            setTimeout(poll, 5000);
+                        } else {
+                            // Still pending — redirect back to opportunity to let it poll
+                            router.replace(`/researchopportunities/${opportunityCtx.opportunity_id}`);
+                        }
+                    };
+
+                    await poll();
+                    return;
+                }
+
+                // ── Standard course / service payment verify ──────────────────
                 const response = await verifyPayment(paymentId);
 
                 if (isPaymentSuccessful(response)) {

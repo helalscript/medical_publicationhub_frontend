@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
     ArrowLeft,
     Calendar,
@@ -8,34 +8,137 @@ import {
     Building2,
     Bookmark,
     MessageSquare,
+    Users,
+    Infinity,
+    Loader2,
+    CreditCard,
+    CheckCircle2,
+    AlertCircle,
+    RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
-import { addFavourite, getFavourites, removeFavourite } from "@/services/researcher";
+import { useRouter } from "next/navigation";
+import {
+    addFavourite,
+    getFavourites,
+    removeFavourite,
+    enrollInOpportunity,
+    getEnrollmentStatus,
+} from "@/services/researcher";
+import { getCurrentUser } from "@/services/auth";
+import PaymentForm from "@/components/payment/PaymentForm";
+import { getPaymentCallbackUrl, saveOpportunityEnrollContext } from "@/lib/payment/utils";
 import { toast } from "sonner";
+import type { EnrollmentStatus } from "@/types/opportunity";
+import type { PaymentCardSource } from "@/types/payment";
 
 interface OpportunityDetailProps {
     opportunity: any;
 }
 
 const OpportunityDetail = ({ opportunity }: OpportunityDetailProps) => {
+    const router = useRouter();
+
+    // Favourite state
     const [isSaved, setIsSaved] = useState(false);
     const [favouriteId, setFavouriteId] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
 
+    // Enrollment state
+    const [enrollmentStatus, setEnrollmentStatus] = useState<EnrollmentStatus | null>(null);
+    const [enrollmentChatId, setEnrollmentChatId] = useState<number | null>(null);
+    const [enrollmentLoading, setEnrollmentLoading] = useState(true);
+    const [showPaymentForm, setShowPaymentForm] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+    const isFree = parseFloat(opportunity.price || "0") === 0;
+    const price = parseFloat(opportunity.price || "0");
+    const availableSeats = opportunity.available_seats;
+    const isSeatsAvailable = availableSeats === null || availableSeats > 0;
+    const isActive = opportunity.status === "active";
+    const canEnroll = isActive && isSeatsAvailable;
+
+    // ─── Fetch initial enrollment status ─────────────────────────────────────
+    const fetchEnrollmentStatus = useCallback(async () => {
+        try {
+            const user = await getCurrentUser();
+            if (!user) {
+                setEnrollmentLoading(false);
+                return;
+            }
+            const res: any = await getEnrollmentStatus(opportunity.id);
+            if ((res?.success || res?.status) && res?.data) {
+                setEnrollmentStatus(res.data.status);
+                setEnrollmentChatId(res.data.chat_id ?? null);
+            } else {
+                setEnrollmentStatus("not_enrolled");
+            }
+        } catch {
+            setEnrollmentStatus("not_enrolled");
+        } finally {
+            setEnrollmentLoading(false);
+        }
+    }, [opportunity.id]);
+
+    // ─── Poll while pending ───────────────────────────────────────────────────
+    const startPolling = useCallback(() => {
+        if (pollingRef.current) return;
+        pollingRef.current = setInterval(async () => {
+            try {
+                const res: any = await getEnrollmentStatus(opportunity.id);
+                if (res?.data?.status === "enrolled") {
+                    clearInterval(pollingRef.current!);
+                    pollingRef.current = null;
+                    setEnrollmentStatus("enrolled");
+                    setEnrollmentChatId(res.data.chat_id ?? null);
+                    toast.success("You are now enrolled! Chat group is ready.");
+                } else if (res?.data?.status === "failed") {
+                    clearInterval(pollingRef.current!);
+                    pollingRef.current = null;
+                    setEnrollmentStatus("failed");
+                    toast.error("Payment failed. Please try again.");
+                }
+            } catch { /* ignore */ }
+        }, 5000);
+    }, [opportunity.id]);
+
+    useEffect(() => {
+        fetchEnrollmentStatus();
+        return () => {
+            if (pollingRef.current) clearInterval(pollingRef.current);
+        };
+    }, [fetchEnrollmentStatus]);
+
+    useEffect(() => {
+        if (enrollmentStatus === "pending") {
+            startPolling();
+        }
+        return () => {
+            if (enrollmentStatus !== "pending" && pollingRef.current) {
+                clearInterval(pollingRef.current);
+                pollingRef.current = null;
+            }
+        };
+    }, [enrollmentStatus, startPolling]);
+
+    // ─── Favourite ────────────────────────────────────────────────────────────
     useEffect(() => {
         const checkFavourite = async () => {
             try {
                 const res = await getFavourites();
                 if (res?.status && Array.isArray(res.data)) {
-                    const fav = res.data.find((f: any) => f.opportunity_id === opportunity.id || f.opportunity?.id === opportunity.id);
+                    const fav = res.data.find(
+                        (f: any) =>
+                            f.opportunity_id === opportunity.id ||
+                            f.opportunity?.id === opportunity.id
+                    );
                     if (fav) {
                         setIsSaved(true);
                         setFavouriteId(fav.id);
                     }
                 }
-            } catch {
-                // User may not be logged in
-            }
+            } catch { /* not logged in */ }
         };
         checkFavourite();
     }, [opportunity.id]);
@@ -69,7 +172,258 @@ const OpportunityDetail = ({ opportunity }: OpportunityDetailProps) => {
         }
     };
 
+    // ─── Free enrollment (no payment) ────────────────────────────────────────
+    const handleFreeEnroll = async () => {
+        const user = await getCurrentUser();
+        if (!user) {
+            router.push(`/login?redirect=/researchopportunities/${opportunity.id}`);
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const res: any = await enrollInOpportunity(opportunity.id);
+            if ((res?.success || res?.status) && res?.data?.status === "enrolled") {
+                setEnrollmentStatus("enrolled");
+                setEnrollmentChatId(res.data.chat_id ?? null);
+                toast.success("Successfully enrolled!");
+            } else if ((res?.success || res?.status) && res?.data?.status === "pending") {
+                setEnrollmentStatus("pending");
+                toast.info("Enrollment pending…");
+            } else {
+                toast.error(res?.message || "Enrollment failed. Please try again.");
+            }
+        } catch {
+            toast.error("An error occurred. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    // ─── Paid enrollment (with payment form) ─────────────────────────────────
+    const handlePaidEnroll = async (source: PaymentCardSource) => {
+        const user = await getCurrentUser();
+        if (!user) {
+            router.push(`/login?redirect=/researchopportunities/${opportunity.id}`);
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const callbackUrl = getPaymentCallbackUrl();
+            const res: any = await enrollInOpportunity(opportunity.id, {
+                callback_url: callbackUrl,
+                source,
+            });
+
+            if (!(res?.success || res?.status)) {
+                toast.error(res?.message || "Payment request failed.");
+                return;
+            }
+
+            const status = res?.data?.status;
+            const moyasarPayment = res?.data?.moyasar_payment;
+
+            if (status === "enrolled") {
+                setEnrollmentStatus("enrolled");
+                setEnrollmentChatId(res.data.chat_id ?? null);
+                toast.success("Successfully enrolled!");
+                setShowPaymentForm(false);
+                return;
+            }
+
+            if (status === "pending" && moyasarPayment?.source?.transaction_url) {
+                // Save context so callback page knows this is an opportunity enrollment
+                saveOpportunityEnrollContext({ opportunity_id: opportunity.id });
+                // Redirect to 3DS / OTP page
+                window.location.href = moyasarPayment.source.transaction_url;
+                return;
+            }
+
+            if (status === "pending") {
+                setEnrollmentStatus("pending");
+                setShowPaymentForm(false);
+                toast.info("Payment is being processed…");
+                return;
+            }
+
+            toast.error(res?.message || "Payment failed. Please try again.");
+        } catch {
+            toast.error("An error occurred. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    // ─── Enroll button click ──────────────────────────────────────────────────
+    const handleEnrollClick = async () => {
+        const user = await getCurrentUser();
+        if (!user) {
+            router.push(`/login?redirect=/researchopportunities/${opportunity.id}`);
+            return;
+        }
+        if (isFree) {
+            await handleFreeEnroll();
+        } else {
+            setShowPaymentForm(true);
+        }
+    };
+
     if (!opportunity) return null;
+
+    // ─── Seats badge ──────────────────────────────────────────────────────────
+    const SeatsBadge = () => {
+        if (availableSeats === null) {
+            return (
+                <div className="flex items-center gap-1.5 text-[#2A9D90] text-xs font-semibold">
+                    <Infinity className="w-3.5 h-3.5" />
+                    <span>Unlimited Seats</span>
+                </div>
+            );
+        }
+        if (availableSeats === 0) {
+            return (
+                <div className="flex items-center gap-1.5 text-red-400 text-xs font-semibold">
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Seats Full</span>
+                </div>
+            );
+        }
+        return (
+            <div className="flex items-center gap-1.5 text-[#A3A7AE] text-xs font-medium">
+                <Users className="w-3.5 h-3.5" />
+                <span>{availableSeats} seats remaining</span>
+            </div>
+        );
+    };
+
+    // ─── Enrollment action panel ──────────────────────────────────────────────
+    const renderEnrollmentPanel = () => {
+        if (enrollmentLoading) {
+            return (
+                <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-5 h-5 text-[#00D1FF] animate-spin" />
+                </div>
+            );
+        }
+
+        // Show payment form
+        if (showPaymentForm && !isFree) {
+            return (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-white flex items-center gap-2">
+                            <CreditCard className="w-4 h-4 text-[#00D1FF]" />
+                            Payment Details
+                        </span>
+                        <button
+                            onClick={() => setShowPaymentForm(false)}
+                            className="text-xs text-[#A3A7AE] hover:text-white transition-colors"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                    <div className="bg-[#0A0C0F] rounded-xl p-4 border border-white/5">
+                        <PaymentForm
+                            onSubmit={handlePaidEnroll}
+                            isSubmitting={isSubmitting}
+                            submitLabel={`Pay ${price.toFixed(2)} SAR`}
+                        />
+                    </div>
+                </div>
+            );
+        }
+
+        // Already enrolled
+        if (enrollmentStatus === "enrolled") {
+            return (
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-[#2A9D90] text-sm font-semibold">
+                        <CheckCircle2 className="w-4 h-4" />
+                        You are enrolled
+                    </div>
+                    {enrollmentChatId && (
+                        <Link
+                            href={`/researcher-dashboard/conversation?chat_id=${enrollmentChatId}`}
+                            className="w-full bg-[#2A9D90] hover:bg-[#238f83] text-white font-bold py-3.5 rounded-xl text-sm transition-all duration-300 flex items-center justify-center gap-2"
+                        >
+                            <MessageSquare className="w-4 h-4" />
+                            Open Chat Group
+                        </Link>
+                    )}
+                </div>
+            );
+        }
+
+        // Payment pending
+        if (enrollmentStatus === "pending") {
+            return (
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-yellow-400 text-sm font-semibold">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Payment Pending
+                    </div>
+                    <p className="text-[#A3A7AE] text-xs leading-relaxed">
+                        Your payment is being processed. You will be added to the chat group once confirmed.
+                    </p>
+                </div>
+            );
+        }
+
+        // Payment failed — retry option
+        if (enrollmentStatus === "failed") {
+            return (
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-red-400 text-sm font-semibold">
+                        <AlertCircle className="w-4 h-4" />
+                        Payment Failed
+                    </div>
+                    <button
+                        onClick={() => setShowPaymentForm(true)}
+                        className="w-full bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 font-bold py-3.5 rounded-xl text-sm transition-all duration-300 flex items-center justify-center gap-2"
+                    >
+                        <RotateCcw className="w-4 h-4" />
+                        Retry Payment
+                    </button>
+                </div>
+            );
+        }
+
+        // Inactive opportunity
+        if (!isActive) {
+            return (
+                <div className="w-full bg-white/5 text-[#A3A7AE] font-semibold py-4 rounded-xl text-sm text-center">
+                    Not Accepting Enrollments
+                </div>
+            );
+        }
+
+        // Seats full
+        if (!isSeatsAvailable) {
+            return (
+                <div className="w-full bg-white/5 text-[#A3A7AE] font-semibold py-4 rounded-xl text-sm text-center">
+                    Seats Full
+                </div>
+            );
+        }
+
+
+
+        // Default — Enroll Now button
+        return (
+            <button
+                onClick={handleEnrollClick}
+                disabled={isSubmitting}
+                className="w-full bg-[#00E5FF] hover:bg-[#00D1FF] disabled:opacity-60 disabled:cursor-not-allowed text-black font-bold py-4 rounded-xl text-sm transition-all duration-300 flex items-center justify-center gap-2"
+            >
+                {isSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                    <>
+                        {isFree ? "Enroll Now — Free" : `Enroll Now — ${price.toFixed(2)} SAR`}
+                    </>
+                )}
+            </button>
+        );
+    };
 
     return (
         <section className="min-h-screen bg-[#0A0C0F] text-white py-12 px-6 md:px-12 lg:px-20 font-inter">
@@ -158,14 +512,27 @@ const OpportunityDetail = ({ opportunity }: OpportunityDetailProps) => {
                     </div>
 
                     <div className="lg:col-span-4 space-y-6">
+                        {/* ── Enrollment Card ─────────────────── */}
                         <div className="bg-[#111419] border border-white/5 rounded-t-2xl p-6 space-y-4">
-                            <Link
-                                href={`/researchopportunities/apply/${opportunity.id}`}
-                                className="w-full bg-[#00E5FF] hover:bg-[#00D1FF] text-black font-bold py-4 rounded-xl text-sm transition-all duration-300 flex items-center justify-center"
-                            >
-                                Apply Now
-                            </Link>
-                            <div className="flex gap-3">
+                            {/* Price + seats row */}
+                            <div className="flex items-center justify-between mb-1">
+                                {isFree ? (
+                                    <span className="px-3 py-1 bg-[#2A9D90]/15 border border-[#2A9D90]/30 rounded-full text-[#2A9D90] text-xs font-bold">
+                                        Free
+                                    </span>
+                                ) : (
+                                    <span className="text-2xl font-bold text-white">
+                                        {price.toFixed(2)} <span className="text-sm font-medium text-[#A3A7AE]">SAR</span>
+                                    </span>
+                                )}
+                                <SeatsBadge />
+                            </div>
+
+                            {/* Enrollment action */}
+                            {renderEnrollmentPanel()}
+
+                            {/* Save button */}
+                            <div className="flex gap-3 pt-1">
                                 <button
                                     onClick={handleSave}
                                     disabled={saving}
@@ -177,14 +544,21 @@ const OpportunityDetail = ({ opportunity }: OpportunityDetailProps) => {
                             </div>
                         </div>
 
+                        {/* ── Mentor Card ──────────────────────── */}
                         {opportunity.mentor && (
                             <div className="bg-[#111419] border border-white/5 rounded-b-2xl p-8 space-y-8">
                                 <div>
                                     <p className="text-sm font-bold text-white mb-6 tracking-tight">Mentor</p>
                                     <div className="flex items-center gap-4">
                                         <img
-                                            src={opportunity.mentor?.user?.avatar || "https://images.unsplash.com/photo-1559839734-2b71f1536783?q=80&w=1470&auto=format&fit=crop"}
+                                            src={opportunity.mentor?.user?.avatar && opportunity.mentor?.user?.avatar !== "null" && opportunity.mentor?.user?.avatar !== "undefined"
+                                                ? opportunity.mentor.user.avatar 
+                                                : "https://images.unsplash.com/photo-1559839734-2b71f1536783?q=80&w=1470&auto=format&fit=crop"
+                                            }
                                             alt="Mentor"
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1559839734-2b71f1536783?q=80&w=1470&auto=format&fit=crop";
+                                            }}
                                             className="w-14 h-14 rounded-full object-cover border-2 border-[#00D1FF]/20"
                                         />
                                         <div>
@@ -195,7 +569,7 @@ const OpportunityDetail = ({ opportunity }: OpportunityDetailProps) => {
                                 </div>
 
                                 <Link
-                                    href="/myprofile/conversation"
+                                    href="/researcher-dashboard/conversation"
                                     className="w-full bg-[#111419] border border-white/5 hover:bg-white/5 text-white font-semibold py-3.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-300"
                                 >
                                     <MessageSquare className="w-4 h-4" /> Contact Mentor

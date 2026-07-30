@@ -27,6 +27,8 @@ export interface Chat {
     status: string;
     chatable: Opportunity;
     users?: ChatUser[];
+    last_message?: Message | null;
+    unseen_count?: number;
 }
 
 export interface Message {

@@ -13,6 +13,21 @@ interface ChatListProps {
   setSearchQuery: (val: string) => void;
 }
 
+const formatTime = (timeStr?: string) => {
+  if (!timeStr) return "";
+  try {
+    const date = new Date(timeStr);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    if (isToday) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  } catch {
+    return "";
+  }
+};
+
 const ChatList = ({ conversations, activeConv, setActiveConv, searchQuery, setSearchQuery }: ChatListProps) => {
   const filteredConversations = conversations.filter((conv) =>
     conv.chatable?.title?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -52,14 +67,30 @@ const ChatList = ({ conversations, activeConv, setActiveConv, searchQuery, setSe
                 )}
               </div>
               <div className="flex-1 text-left overflow-hidden">
-                <div className="flex items-center justify-between mb-0.5">
-                  <h3 className="text-sm font-bold text-white truncate">{conv.chatable?.title}</h3>
+                <div className="flex items-center justify-between gap-1 mb-0.5">
+                  <h3 className={`text-sm truncate ${conv.unseen_count && conv.unseen_count > 0 ? "text-[#00D1FF] font-black" : "text-white font-bold"}`}>
+                    {conv.chatable?.title}
+                  </h3>
+                  {conv.last_message && (
+                    <span className={`text-[10px] shrink-0 ${conv.unseen_count && conv.unseen_count > 0 ? "text-[#00D1FF] font-black" : "text-gray-500"}`}>
+                      {formatTime(conv.last_message.created_at)}
+                    </span>
+                  )}
                 </div>
-                <p className="text-xs text-gray-400 truncate">
-                  {conv.type === "group" && (conv.users?.length ?? 0) > 0
-                    ? `${conv.users!.length} members`
-                    : "Opportunity chat"}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className={`text-xs truncate flex-1 ${conv.unseen_count && conv.unseen_count > 0 ? "text-white font-bold" : "text-gray-400"}`}>
+                    {conv.last_message 
+                      ? (conv.last_message.message || (conv.last_message.file ? "📎 File attachment" : ""))
+                      : (conv.type === "group" && (conv.users?.length ?? 0) > 0
+                          ? `${conv.users!.length} members`
+                          : "Opportunity chat")}
+                  </p>
+                  {conv.unseen_count && conv.unseen_count > 0 ? (
+                    <span className="bg-[#00D1FF] text-black text-[9px] font-black px-1.5 py-0.5 rounded-full flex items-center justify-center shrink-0">
+                      {conv.unseen_count}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             </motion.button>
           ))

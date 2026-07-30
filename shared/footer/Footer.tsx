@@ -131,6 +131,7 @@ const Footer = () => {
                                     src={systemInfo?.logo || navLogo}
                                     alt={systemInfo?.system_name || "PublicationHub Logo"}
                                     fill
+                                    sizes="60px"
                                     className="object-contain object-left"
                                     priority
                                     unoptimized={!!systemInfo?.logo}

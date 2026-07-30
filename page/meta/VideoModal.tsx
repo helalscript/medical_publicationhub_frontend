@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import { X, Play } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -9,9 +9,51 @@ interface VideoModalProps {
     onClose: () => void;
     videoUrl?: string;
     title: string;
+    courseId?: string | number;
+    lessonId?: string | number;
 }
 
-const VideoModal = ({ isOpen, onClose, videoUrl, title }: VideoModalProps) => {
+const VideoModal = ({ isOpen, onClose, videoUrl, title, courseId, lessonId }: VideoModalProps) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    // Restore time progress when modal opens and video ref is ready
+    useEffect(() => {
+        if (isOpen && videoUrl && courseId && lessonId) {
+            // Save last played lesson ID for the course
+            localStorage.setItem(`course_${courseId}_last_played_lesson`, lessonId.toString());
+
+            const timer = setTimeout(() => {
+                if (videoRef.current) {
+                    const savedTime = localStorage.getItem(`course_${courseId}_lesson_${lessonId}_time`);
+                    if (savedTime) {
+                        const parsedTime = parseFloat(savedTime);
+                        if (!isNaN(parsedTime)) {
+                            videoRef.current.currentTime = parsedTime;
+                        }
+                    }
+                }
+            }, 300); // Small delay to let video metadata load
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen, videoUrl, courseId, lessonId]);
+
+    // Handle updates to saving position
+    const handleTimeUpdate = () => {
+        if (videoRef.current && courseId && lessonId) {
+            localStorage.setItem(
+                `course_${courseId}_lesson_${lessonId}_time`,
+                videoRef.current.currentTime.toString()
+            );
+        }
+    };
+
+    // Mark as completed when the video ends
+    const handleEnded = () => {
+        if (courseId && lessonId) {
+            localStorage.setItem(`course_${courseId}_lesson_${lessonId}_completed`, "true");
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -50,9 +92,12 @@ const VideoModal = ({ isOpen, onClose, videoUrl, title }: VideoModalProps) => {
                     <div className="w-full h-full flex items-center justify-center bg-black">
                         {videoUrl ? (
                             <video
+                                ref={videoRef}
                                 controls
                                 className="w-full h-full object-contain"
                                 autoPlay
+                                onTimeUpdate={handleTimeUpdate}
+                                onEnded={handleEnded}
                             >
                                 <source src={videoUrl} type="video/mp4" />
                                 Your browser does not support the video tag.

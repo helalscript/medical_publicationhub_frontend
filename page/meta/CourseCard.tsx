@@ -28,6 +28,7 @@ const CourseCard = ({ course, onPlay }: CourseCardProps) => {
                         src={course.thumbnail}
                         alt={course.title}
                         fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         className="object-cover group-hover/thumb:scale-110 transition-transform duration-700"
                     />
                 ) : (
@@ -62,6 +63,7 @@ const CourseCard = ({ course, onPlay }: CourseCardProps) => {
                                 src={course.mentors[0].user.avatar}
                                 alt={course.mentors[0].user.name}
                                 fill
+                                sizes="36px"
                                 className="object-cover"
                             />
                         ) : (

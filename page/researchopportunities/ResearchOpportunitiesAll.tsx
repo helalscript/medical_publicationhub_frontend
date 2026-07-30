@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Search, ChevronDown, Filter, Calendar, User, ArrowRight, ChevronLeft, Loader2 } from "lucide-react";
+import { Search, Calendar, User, ArrowRight, ChevronLeft, Loader2, Users, Infinity, Tag } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { getAllOpportunities } from "@/services/home";
@@ -44,14 +44,12 @@ const ResearchOpportunitiesAll = () => {
     const filteredOpportunities = opportunities.filter((opp: any) => {
         if (!searchQuery) return true;
         const lowerQuery = searchQuery.toLowerCase();
-        
         const matchTitle = opp.title?.toLowerCase().includes(lowerQuery);
         const matchOverview = opp.overview?.toLowerCase().includes(lowerQuery);
         const matchMentor = opp.mentor?.user?.name?.toLowerCase().includes(lowerQuery);
-        const matchInstitution = opp.university_hospitals?.some((inst: any) => 
+        const matchInstitution = opp.university_hospitals?.some((inst: any) =>
             inst.name?.toLowerCase().includes(lowerQuery)
         );
-
         return matchTitle || matchOverview || matchMentor || matchInstitution;
     });
 
@@ -66,10 +64,10 @@ const ResearchOpportunitiesAll = () => {
                     </p>
                 </div>
 
-                {/* Search & Filters */}
+                {/* Search */}
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-12">
                     <div className="relative w-full lg:max-w-xl">
-                        <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-[#64748B] w-4.5 h-4.5 transition-colors group-focus-within:text-[#00D1FF]" />
+                        <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-[#64748B] w-4.5 h-4.5 transition-colors" />
                         <input
                             type="text"
                             value={searchQuery}
@@ -78,18 +76,6 @@ const ResearchOpportunitiesAll = () => {
                             className="w-full bg-[#111419] border border-white/5 rounded-[12px] py-3.5 pl-12 pr-5 text-sm md:text-base placeholder:text-[#64748B] focus:outline-none focus:border-[#00D1FF]/40 transition-all duration-300"
                         />
                     </div>
-
-                    {/* <div className="flex items-center flex-wrap gap-3 w-full lg:w-auto">
-                        <button className="flex items-center justify-between gap-2.5 bg-[#111419] border border-white/5 rounded-[10px] px-5 py-2.5 text-sm min-w-[170px] hover:bg-white/5 transition-all text-[#A3A7AE] group">
-                            All Specialties <ChevronDown className="w-4 h-4 group-hover:text-white transition-colors" />
-                        </button>
-                        <button className="flex items-center justify-between gap-2.5 bg-[#111419] border border-white/5 rounded-[10px] px-5 py-2.5 text-sm min-w-[150px] hover:bg-white/5 transition-all text-[#A3A7AE] group">
-                            Sort: Newest <ChevronDown className="w-4 h-4 group-hover:text-white transition-colors" />
-                        </button>
-                        <button className="flex items-center gap-2.5 bg-[#111419] border border-white/5 rounded-[10px] px-5 py-2.5 text-sm hover:bg-white/5 transition-all text-[#A3A7AE] group">
-                            <Filter className="w-4 h-4 group-hover:text-white transition-colors" /> More Filters
-                        </button>
-                    </div> */}
                 </div>
 
                 {/* Grid */}
@@ -112,13 +98,13 @@ const ResearchOpportunitiesAll = () => {
                                     {/* Card Image */}
                                     <div className="relative h-56 overflow-hidden bg-gray-800">
                                         <img
-                                            src={opp.thumbnail || "https://images.unsplash.com/photo-1614935151651-0bea6508db6b?q=80&w=1471&auto=format&fit=crop"}
+                                            src={(opp as any).thumbnail || "https://images.unsplash.com/photo-1614935151651-0bea6508db6b?q=80&w=1471&auto=format&fit=crop"}
                                             alt={opp.title}
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-[#111419] via-transparent to-transparent opacity-30" />
                                         <span className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-[10px] font-bold text-black uppercase tracking-wider bg-[#00D1FF] shadow-lg shadow-black/10">
-                                            {opp.categories?.[0]?.name || "Uncategorized"}
+                                            {(opp as any).categories?.[0]?.name || "Uncategorized"}
                                         </span>
                                     </div>
 
@@ -127,31 +113,57 @@ const ResearchOpportunitiesAll = () => {
                                         <h3 className="text-xl font-bold mb-3 text-white tracking-tight leading-snug h-[3.5rem] line-clamp-2">
                                             {opp.title}
                                         </h3>
-                                        <p className="text-[#A3A7AE]/80 text-[13px] md:text-sm mb-6 line-clamp-2 leading-relaxed font-inter h-[2.5rem]">
-                                            {opp.overview}
+                                        <p className="text-[#A3A7AE]/80 text-[13px] md:text-sm mb-5 line-clamp-2 leading-relaxed font-inter h-[2.5rem]">
+                                            {(opp as any).overview}
                                         </p>
 
-                                        <div className="flex flex-col gap-3 mb-6">
-                                            <div className="flex items-center gap-3 group/info">
+                                        <div className="flex flex-col gap-3 mb-4">
+                                            <div className="flex items-center gap-3">
                                                 <User className="w-4.5 h-4.5 text-[#00D1FF]" strokeWidth={1.5} />
                                                 <span className="text-xs font-medium text-[#A3A7AE]/90">
-                                                    {opp.mentor?.user?.name || "Anonymous Mentor"}
+                                                    {(opp as any).mentor?.user?.name || "Anonymous Mentor"}
                                                 </span>
                                             </div>
-                                            <div className="flex items-center gap-3 group/info">
+                                            <div className="flex items-center gap-3">
                                                 <Calendar className="w-4.5 h-4.5 text-[#00D1FF]" strokeWidth={1.5} />
                                                 <span className="text-xs font-medium text-[#A3A7AE]/90">
-                                                    Deadline: {new Date(opp.dead_line).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                                    Deadline: {new Date((opp as any).dead_line).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                                                 </span>
                                             </div>
                                         </div>
 
+                                        {/* Price & Seats */}
+                                        <div className="flex items-center justify-between mb-5 px-0.5">
+                                            {parseFloat((opp as any).price || "0") === 0 ? (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#2A9D90]/15 border border-[#2A9D90]/30 rounded-full text-[#2A9D90] text-[11px] font-bold">
+                                                    <Tag className="w-3 h-3" /> Free
+                                                </span>
+                                            ) : (
+                                                <span className="text-white font-bold text-sm">
+                                                    {parseFloat((opp as any).price).toFixed(2)} <span className="text-[#A3A7AE] text-[11px] font-normal">SAR</span>
+                                                </span>
+                                            )}
+                                            {(opp as any).available_seats === null ? (
+                                                <span className="inline-flex items-center gap-1 text-[#2A9D90] text-[11px] font-semibold">
+                                                    <Infinity className="w-3 h-3" /> Unlimited
+                                                </span>
+                                            ) : (opp as any).available_seats === 0 ? (
+                                                <span className="inline-flex items-center gap-1 text-red-400 text-[11px] font-semibold">
+                                                    <Users className="w-3 h-3" /> Seats Full
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 text-[#A3A7AE] text-[11px]">
+                                                    <Users className="w-3 h-3" /> {(opp as any).available_seats} left
+                                                </span>
+                                            )}
+                                        </div>
+
                                         <div className="flex items-center gap-3">
                                             <Link
-                                                href={`/researchopportunities/apply/${opp.id}`}
+                                                href={`/researchopportunities/${opp.id}`}
                                                 className="flex-[3.5] bg-[#00E5FF] hover:bg-[#00D1FF] text-black font-bold py-2.5 px-6 rounded-lg text-xs md:text-sm transition-all duration-300 flex items-center justify-center gap-2 group/btn active:scale-[0.98]"
                                             >
-                                                Apply Now <ArrowRight className="w-4.5 h-4.5 group-hover/btn:translate-x-1 transition-transform" />
+                                                Enroll Now <ArrowRight className="w-4.5 h-4.5 group-hover/btn:translate-x-1 transition-transform" />
                                             </Link>
                                             <Link
                                                 href={`/researchopportunities/${opp.id}`}
@@ -183,12 +195,7 @@ const ResearchOpportunitiesAll = () => {
                         </button>
 
                         {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
-                            // Show first, last, current, and one around current
-                            if (
-                                num === 1 ||
-                                num === totalPages ||
-                                (num >= currentPage - 1 && num <= currentPage + 1)
-                            ) {
+                            if (num === 1 || num === totalPages || (num >= currentPage - 1 && num <= currentPage + 1)) {
                                 return (
                                     <button
                                         key={num}
@@ -202,10 +209,7 @@ const ResearchOpportunitiesAll = () => {
                                         {num}
                                     </button>
                                 );
-                            } else if (
-                                (num === currentPage - 2 && num > 1) ||
-                                (num === currentPage + 2 && num < totalPages)
-                            ) {
+                            } else if ((num === currentPage - 2 && num > 1) || (num === currentPage + 2 && num < totalPages)) {
                                 return <span key={num} className="text-[#64748B] px-1 md:px-2">...</span>;
                             }
                             return null;

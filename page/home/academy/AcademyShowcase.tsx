@@ -59,7 +59,7 @@ const AcademyCourseCard = ({ course }: { course: Course }) => {
                 <div className="flex items-center gap-2">
                     <div className="relative w-8 h-8 rounded-full overflow-hidden border border-white/10 bg-[#1F242D] shrink-0">
                         {instructorAvatar ? (
-                            <Image src={instructorAvatar} alt={instructorName} fill className="object-cover" />
+                            <Image src={instructorAvatar} alt={instructorName} fill sizes="32px" className="object-cover" />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center">
                                 <User size={14} className="text-[#A3A7AE]" />

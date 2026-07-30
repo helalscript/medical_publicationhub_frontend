@@ -270,7 +270,7 @@ const Navbar = ({ initialUser, initialSystemInfo }: NavbarProps) => {
                             >
                                 <div className="w-10 h-10 rounded-full border-2 border-[#00D1FF]/30 group-hover:border-[#00D1FF] transition-all overflow-hidden relative bg-[#1F242D]">
                                     {user.avatar ? (
-                                        <Image src={user.avatar} alt={user.name || "User avatar"} fill className="object-cover" />
+                                        <Image src={user.avatar} alt={user.name || "User avatar"} fill sizes="40px" className="object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-[#00D1FF]">
                                             <User size={20} />
@@ -376,7 +376,7 @@ const Navbar = ({ initialUser, initialSystemInfo }: NavbarProps) => {
                                 <div className="flex items-center gap-3 px-4">
                                      <div className="w-12 h-12 rounded-full border border-[#00D1FF]/30 overflow-hidden relative">
                                         {user.avatar ? (
-                                            <Image src={user.avatar} alt={user.name || "User avatar"} fill className="object-cover" />
+                                            <Image src={user.avatar} alt={user.name || "User avatar"} fill sizes="48px" className="object-cover" />
                                         ) : (
                                             <div className="w-full h-full bg-[#1F242D] flex items-center justify-center text-[#00D1FF]">
                                                 <User size={24} />

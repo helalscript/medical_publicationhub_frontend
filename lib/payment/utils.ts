@@ -106,3 +106,36 @@ export const handleMoyasarPaymentResponse = (
         moyasarPayment.id
     );
 };
+
+// ─── Opportunity enrollment context (for callback routing) ───────────────────
+
+const OPPORTUNITY_ENROLL_CONTEXT_KEY = "opportunity_enroll_context";
+
+export type OpportunityEnrollContext = {
+    opportunity_id: number;
+    opportunity_slug?: string;
+};
+
+export const saveOpportunityEnrollContext = (ctx: OpportunityEnrollContext) => {
+    if (typeof window !== "undefined") {
+        sessionStorage.setItem(OPPORTUNITY_ENROLL_CONTEXT_KEY, JSON.stringify(ctx));
+    }
+};
+
+export const getOpportunityEnrollContext = (): OpportunityEnrollContext | null => {
+    if (typeof window === "undefined") return null;
+    const raw = sessionStorage.getItem(OPPORTUNITY_ENROLL_CONTEXT_KEY);
+    if (!raw) return null;
+    try {
+        return JSON.parse(raw) as OpportunityEnrollContext;
+    } catch {
+        return null;
+    }
+};
+
+export const clearOpportunityEnrollContext = () => {
+    if (typeof window !== "undefined") {
+        sessionStorage.removeItem(OPPORTUNITY_ENROLL_CONTEXT_KEY);
+    }
+};
+

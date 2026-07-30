@@ -27,7 +27,7 @@ import metaBg from "@/assets/images/metabg.png";
 import { motion } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { getCourseDetails } from "@/services/home";
+import { getCourseDetails, getMyCourses } from "@/services/home";
 import { buildCheckoutUrl } from "@/lib/payment/utils";
 import { Course } from "@/types/course";
 import { Loader2 } from "lucide-react";
@@ -41,9 +41,12 @@ const CourseDetails = () => {
     const [course, setCourse] = useState<Course | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [selectedVideo, setSelectedVideo] = useState<{ title: string; videoUrl?: string | null } | null>(null);
+    const [selectedVideo, setSelectedVideo] = useState<{ title: string; videoUrl?: string | null; lessonId?: string | number } | null>(null);
     const [selectedTextContent, setSelectedTextContent] = useState<{ title: string; content: string } | null>(null);
     const [expandedModules, setExpandedModules] = useState<number[]>([]);
+    const [isEnrolled, setIsEnrolled] = useState(false);
+    const [lastPlayedLesson, setLastPlayedLesson] = useState<{ id: number; title: string; video: string } | null>(null);
+    const [completedLessons, setCompletedLessons] = useState<number[]>([]);
 
     const handleEnroll = () => {
         if (!course) return;
@@ -89,6 +92,45 @@ const CourseDetails = () => {
         fetchDetails();
     }, [id]);
 
+    useEffect(() => {
+        if (!course) return;
+
+        const checkEnrollment = async () => {
+            try {
+                const res = await getMyCourses();
+                if (res?.status) {
+                    const enrolledData = Array.isArray(res.data) 
+                        ? res.data 
+                        : (res.data?.data || []);
+                    const enrolled = enrolledData.some((c: any) => c.id.toString() === course.id.toString());
+                    setIsEnrolled(enrolled);
+                }
+            } catch (err) {
+                console.error("Error checking course enrollment:", err);
+            }
+        };
+        checkEnrollment();
+
+        // Load completed lessons & last played lesson
+        const completed: number[] = [];
+        let lastPlayed: typeof lastPlayedLesson = null;
+        const lastPlayedId = localStorage.getItem(`course_${course.id}_last_played_lesson`);
+
+        course.modules?.forEach((module: any) => {
+            module.lessons?.forEach((lesson: any) => {
+                if (localStorage.getItem(`course_${course.id}_lesson_${lesson.id}_completed`) === "true") {
+                    completed.push(lesson.id);
+                }
+                if (lastPlayedId && lesson.id.toString() === lastPlayedId) {
+                    lastPlayed = { id: lesson.id, title: lesson.title, video: lesson.video };
+                }
+            });
+        });
+
+        setCompletedLessons(completed);
+        setLastPlayedLesson(lastPlayed);
+    }, [course]);
+
     if (loading) {
         return (
             <div className="min-h-screen bg-[#0A0C0F] flex items-center justify-center">
@@ -113,6 +155,7 @@ const CourseDetails = () => {
                     src={metaBg}
                     alt="Background"
                     fill
+                    sizes="100vw"
                     className="object-cover opacity-30 select-none pointer-events-none"
                     priority
                 />
@@ -211,6 +254,7 @@ const CourseDetails = () => {
                                             src={course.mentors[0].user.avatar}
                                             alt={course.mentors[0].user.name}
                                             fill
+                                            sizes="96px"
                                             className="object-cover"
                                         />
                                     ) : (
@@ -251,6 +295,7 @@ const CourseDetails = () => {
                                         src={course.thumbnail}
                                         alt={course.title}
                                         fill
+                                        sizes="(max-width: 1024px) 100vw, 420px"
                                         className="object-cover transition-transform duration-1000 group-hover/media:scale-110"
                                     />
                                 ) : (
@@ -271,34 +316,57 @@ const CourseDetails = () => {
 
                             {/* Sidebar Content */}
                             <div className="p-8">
-                                {/* Pricing */}
-                                <div className="mb-8">
-                                    <div className="flex items-baseline gap-4 mb-3">
-                                        <span className="text-5xl font-black text-cyan-400 tracking-tighter">${course.price}</span>
-                                        {course.old_price && (
-                                            <span className="text-xl text-gray-500 line-through font-medium opacity-60">${course.old_price}</span>
+                                {isEnrolled ? (
+                                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-6 text-center space-y-4 mb-10">
+                                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400">
+                                            <CheckCircle2 className="w-6 h-6" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-white font-black text-lg">You are Enrolled</p>
+                                            <p className="text-xs text-gray-400 leading-relaxed">You have full access to all curriculum modules and lessons.</p>
+                                        </div>
+                                        {lastPlayedLesson && (
+                                            <button
+                                                onClick={() => setSelectedVideo({ title: lastPlayedLesson.title, videoUrl: lastPlayedLesson.video, lessonId: lastPlayedLesson.id })}
+                                                className="w-full mt-2 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs transition-all active:scale-[0.97] flex items-center justify-center gap-1.5"
+                                            >
+                                                <Play className="w-3.5 h-3.5 fill-current" />
+                                                RESUME: {lastPlayedLesson.title.length > 20 ? lastPlayedLesson.title.substring(0, 20) + "..." : lastPlayedLesson.title}
+                                            </button>
                                         )}
                                     </div>
-                                    <div className="inline-flex items-center gap-2 text-emerald-400 text-[13px] font-bold uppercase tracking-wider">
-                                        <Star className="w-4 h-4 fill-current" />
-                                        Limited Time Offer
-                                    </div>
-                                </div>
+                                ) : (
+                                    <>
+                                        {/* Pricing */}
+                                        <div className="mb-8">
+                                            <div className="flex items-baseline gap-4 mb-3">
+                                                <span className="text-5xl font-black text-cyan-400 tracking-tighter">${course.price}</span>
+                                                {course.old_price && (
+                                                    <span className="text-xl text-gray-500 line-through font-medium opacity-60">${course.old_price}</span>
+                                                )}
+                                            </div>
+                                            <div className="inline-flex items-center gap-2 text-emerald-400 text-[13px] font-bold uppercase tracking-wider">
+                                                <Star className="w-4 h-4 fill-current" />
+                                                Limited Time Offer
+                                            </div>
+                                        </div>
 
-                                {/* Enrollment CTA */}
-                                <div className="space-y-4 mb-10">
-                                    <button
-                                        onClick={handleEnroll}
-                                        className="w-full py-5 rounded-2xl bg-gradient-to-r from-[#00D4FF] to-[#8E90FF] text-white font-black text-lg transition-all active:scale-[0.98] shadow-[0_10px_25px_rgba(0,212,255,0.2)] flex items-center justify-center gap-2 group"
-                                    >
-                                        ENROLL NOW
-                                        <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
-                                    </button>
+                                        {/* Enrollment CTA */}
+                                        <div className="space-y-4 mb-10">
+                                            <button
+                                                onClick={handleEnroll}
+                                                className="w-full py-5 rounded-2xl bg-gradient-to-r from-[#00D4FF] to-[#8E90FF] text-white font-black text-lg transition-all active:scale-[0.98] shadow-[0_10px_25px_rgba(0,212,255,0.2)] flex items-center justify-center gap-2 group"
+                                            >
+                                                ENROLL NOW
+                                                <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
+                                            </button>
 
-                                    <button className="w-full py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold text-sm transition-all border border-white/10">
-                                        {course.thumbnail_button_text || "Try Free Sample"}
-                                    </button>
-                                </div>
+                                            <button className="w-full py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold text-sm transition-all border border-white/10">
+                                                {course.thumbnail_button_text || "Try Free Sample"}
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
 
                                 {/* Feature List */}
                                 <div>
@@ -333,8 +401,9 @@ const CourseDetails = () => {
                         </h2>
 
                         <div className="space-y-6">
-                            {course.modules.map((module, idx) => {
+                             {course.modules.map((module, idx) => {
                                 const isExpanded = expandedModules.includes(module.id);
+                                const isLocked = module.is_locked && !isEnrolled;
                                 return (
                                     <div key={module.id} className="space-y-4">
                                         <motion.div
@@ -359,7 +428,7 @@ const CourseDetails = () => {
                                                         </div>
                                                         <span className="opacity-30 text-lg">•</span>
                                                         <span>{module.durations || "N/A"}</span>
-                                                        {module.is_locked && (
+                                                        {isLocked && (
                                                             <>
                                                                 <span className="opacity-30 text-lg">•</span>
                                                                 <span className="text-amber-500 flex items-center gap-1.5 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
@@ -376,10 +445,10 @@ const CourseDetails = () => {
                                                     {/* Module Resources */}
                                                     {module.video && (
                                                         <button 
-                                                            onClick={() => !module.is_locked && setSelectedVideo({ title: module.title, videoUrl: module.video })}
+                                                            onClick={() => !isLocked && setSelectedVideo({ title: module.title, videoUrl: module.video })}
                                                             className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500 hover:text-white transition-all shadow-lg shadow-cyan-500/5 active:scale-90"
                                                             title="Play Module Video"
-                                                            disabled={module.is_locked}
+                                                            disabled={isLocked}
                                                         >
                                                             <Play className="w-5 h-5 fill-current" />
                                                         </button>
@@ -435,9 +504,9 @@ const CourseDetails = () => {
                                                         {module.lessons.map((lesson) => (
                                                             <div key={lesson.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl bg-white/[0.01] hover:bg-white/[0.03] transition-all border border-transparent hover:border-white/5 group/lesson">
                                                                 <div className="flex items-center gap-4">
-                                                                    <div className="w-2 h-2 rounded-full bg-gray-700 group-hover/lesson:bg-cyan-500 transition-colors shadow-[0_0_8px_rgba(6,182,212,0)] group-hover/lesson:shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
+                                                                    <div className={`w-2 h-2 rounded-full ${completedLessons.includes(lesson.id) ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-gray-700 group-hover/lesson:bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0)] group-hover/lesson:shadow-[0_0_8px_rgba(6,182,212,0.5)]"} transition-colors`} />
                                                                     <div>
-                                                                        <h5 className="text-sm font-bold text-gray-400 group-hover/lesson:text-gray-100 transition-colors">{lesson.title}</h5>
+                                                                        <h5 className={`text-sm font-bold transition-colors ${completedLessons.includes(lesson.id) ? "text-emerald-400 line-through opacity-70" : "text-gray-400 group-hover/lesson:text-gray-100"}`}>{lesson.title}</h5>
                                                                         <span className="text-[10px] text-gray-600 font-black uppercase tracking-[0.2em]">{lesson.durations || "5-10 min"}</span>
                                                                     </div>
                                                                 </div>
@@ -445,9 +514,9 @@ const CourseDetails = () => {
                                                                 <div className="mt-3 md:mt-0 flex items-center gap-2 opacity-60 group-hover/lesson:opacity-100 transition-opacity">
                                                                     {lesson.video && (
                                                                         <button 
-                                                                            onClick={() => !module.is_locked && setSelectedVideo({ title: lesson.title, videoUrl: lesson.video })}
+                                                                            onClick={() => !isLocked && setSelectedVideo({ title: lesson.title, videoUrl: lesson.video, lessonId: lesson.id })}
                                                                             className="p-2 rounded-lg text-cyan-500 hover:bg-cyan-500/10 transition-colors"
-                                                                            disabled={module.is_locked}
+                                                                            disabled={isLocked}
                                                                         >
                                                                             <Play className="w-4 h-4 fill-current" />
                                                                         </button>
@@ -464,9 +533,9 @@ const CourseDetails = () => {
                                                                     )}
                                                         {lesson.attached_text && (
                                                             <button 
-                                                                onClick={() => !module.is_locked && setSelectedTextContent({ title: lesson.title, content: lesson.attached_text || "" })}
+                                                                onClick={() => !isLocked && setSelectedTextContent({ title: lesson.title, content: lesson.attached_text || "" })}
                                                                 className="p-2 rounded-lg text-amber-500 hover:bg-amber-500/10 transition-colors"
-                                                                disabled={module.is_locked}
+                                                                disabled={isLocked}
                                                                 title="View Notes"
                                                             >
                                                                 <Info className="w-4 h-4" />
@@ -499,9 +568,30 @@ const CourseDetails = () => {
 
             <VideoModal 
                 isOpen={!!selectedVideo} 
-                onClose={() => setSelectedVideo(null)} 
+                onClose={() => {
+                    setSelectedVideo(null);
+                    if (course) {
+                        const completed: number[] = [];
+                        let lastPlayed: any = null;
+                        const lastPlayedId = localStorage.getItem(`course_${course.id}_last_played_lesson`);
+                        course.modules?.forEach((module: any) => {
+                            module.lessons?.forEach((lesson: any) => {
+                                if (localStorage.getItem(`course_${course.id}_lesson_${lesson.id}_completed`) === "true") {
+                                    completed.push(lesson.id);
+                                }
+                                if (lastPlayedId && lesson.id.toString() === lastPlayedId) {
+                                    lastPlayed = { id: lesson.id, title: lesson.title, video: lesson.video };
+                                }
+                            });
+                        });
+                        setCompletedLessons(completed);
+                        setLastPlayedLesson(lastPlayed);
+                    }
+                }} 
                 title={selectedVideo?.title || ""} 
                 videoUrl={selectedVideo?.videoUrl || undefined}
+                courseId={course?.id}
+                lessonId={selectedVideo?.lessonId}
             />
 
             <TextContentModal 

@@ -18,6 +18,9 @@ interface ChatWindowProps {
   selectedFile: File | null;
   setSelectedFile: (file: File | null) => void;
   messagesEndRef?: React.RefObject<HTMLDivElement | null>;
+  onLoadMore?: (prevScrollHeight: number) => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
 }
 
 const ChatWindow = ({
@@ -30,16 +33,26 @@ const ChatWindow = ({
   sending,
   selectedFile,
   setSelectedFile,
+  onLoadMore,
+  hasMore = false,
+  loadingMore = false,
 }: ChatWindowProps) => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const internalMessagesEndRef = useRef<HTMLDivElement>(null);
   const isAtBottom = useRef(true);
+  const lastScrollHeightRef = useRef<number>(0);
 
   const handleScroll = () => {
     if (!messagesContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
     // If we are within 100px of the bottom, we consider it "at bottom"
     isAtBottom.current = scrollHeight - scrollTop - clientHeight < 100;
+
+    // Load more when scrolled near the top
+    if (scrollTop < 50 && onLoadMore && hasMore && !loadingMore) {
+      lastScrollHeightRef.current = scrollHeight;
+      onLoadMore(scrollHeight);
+    }
   };
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
@@ -49,14 +62,22 @@ const ChatWindow = ({
   };
 
   useEffect(() => {
-    if (messages.length > 0 && isAtBottom.current) {
-      const timer = setTimeout(() => scrollToBottom("smooth"), 100);
-      return () => clearTimeout(timer);
+    if (messages.length > 0) {
+      if (isAtBottom.current) {
+        const timer = setTimeout(() => scrollToBottom("smooth"), 100);
+        return () => clearTimeout(timer);
+      } else if (lastScrollHeightRef.current > 0 && messagesContainerRef.current) {
+        // Restore scroll position after prepending items
+        const { scrollHeight } = messagesContainerRef.current;
+        messagesContainerRef.current.scrollTop = scrollHeight - lastScrollHeightRef.current;
+        lastScrollHeightRef.current = 0;
+      }
     }
   }, [messages]);
 
   useEffect(() => {
     isAtBottom.current = true;
+    lastScrollHeightRef.current = 0;
     const timer = setTimeout(() => scrollToBottom("auto"), 50);
     return () => clearTimeout(timer);
   }, [activeConv?.id]);

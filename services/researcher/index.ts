@@ -211,3 +211,47 @@ export const removeFavourite = async (id: string | number) => {
         throw error;
     }
 };
+
+// --- Opportunity Enrollment ---
+
+export const enrollInOpportunity = async (
+    opportunityId: number,
+    payload?: {
+        callback_url: string;
+        source: {
+            type: "creditcard";
+            name: string;
+            number: string;
+            cvc: string;
+            month: string;
+            year: string;
+        };
+    }
+) => {
+    try {
+        const response = await fetch(
+            `${process.env.NEXT_PUBLIC_BASE_API}/researcher/opportunities/${opportunityId}/enroll`,
+            {
+                method: "POST",
+                headers: await authHeaders(true),
+                body: payload ? JSON.stringify(payload) : JSON.stringify({}),
+            }
+        );
+        return await response.json();
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const getEnrollmentStatus = async (opportunityId: number) => {
+    try {
+        const response = await fetch(
+            `${process.env.NEXT_PUBLIC_BASE_API}/researcher/opportunities/${opportunityId}/enrollment-status`,
+            { method: "GET", headers: await authHeaders(), cache: "no-store" }
+        );
+        return await response.json();
+    } catch (error) {
+        throw error;
+    }
+};
+

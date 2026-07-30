@@ -27,6 +27,8 @@ export interface Opportunity {
   slug: string;
   overview: string;
   price: string;
+  total_seats: number | null;
+  available_seats: number | null;
   thumbnail: string | null;
   desciptions: OpportunityDescription[];
   dead_line: string;
@@ -45,4 +47,28 @@ export interface Opportunity {
   places: { id: number; name: string }[];
   experience_levels: { id: number; name: string }[];
   mentor: Mentor;
+}
+
+export type EnrollmentStatus = "enrolled" | "pending" | "failed" | "not_enrolled";
+
+export interface EnrollmentApiResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    status: EnrollmentStatus;
+    chat_id?: number | null;
+    payment?: {
+      id: number;
+      status: string;
+      payment_gateway_id?: string;
+    };
+    moyasar_payment?: {
+      id: string;
+      status: string;
+      source?: {
+        transaction_url?: string;
+      };
+    };
+    message?: string;
+  };
 }

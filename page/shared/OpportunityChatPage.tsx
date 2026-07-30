@@ -33,20 +33,54 @@ const OpportunityChatPage = ({ backHref, backLabel, services }: OpportunityChatP
     const [sending, setSending] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    
+    // Pagination states
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+
     const echoRef = useRef<ReturnType<typeof initEcho>>(null);
     const activeConvRef = useRef<Chat | null>(null);
     const subscribedChatIdsRef = useRef<Set<number>>(new Set());
+
+    // Import useSearchParams dynamically if needed, or get it
+    const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const queryChatId = searchParams ? searchParams.get("chat_id") : null;
 
     useEffect(() => {
         activeConvRef.current = activeConv;
     }, [activeConv]);
 
     const appendMessage = useCallback((chatId: number, newMessage: Message) => {
-        if (activeConvRef.current?.id !== chatId) return;
-        setMessages((prev) => {
-            const exists = prev.some((m) => m.id === newMessage.id);
-            if (exists) return prev;
-            return [...prev, newMessage];
+        // 1. Append message if it belongs to the active conversation
+        if (activeConvRef.current?.id === chatId) {
+            setMessages((prev) => {
+                const exists = prev.some((m) => m.id === newMessage.id);
+                if (exists) return prev;
+                return [...prev, newMessage];
+            });
+        }
+
+        // 2. Update conversation list: update last_message, increment unseen_count, and move to top
+        setConversations((prev) => {
+            const updated = prev.map((conv) => {
+                if (conv.id === chatId) {
+                    const isCurrentActive = activeConvRef.current?.id === chatId;
+                    return {
+                        ...conv,
+                        last_message: newMessage,
+                        unseen_count: isCurrentActive ? 0 : (conv.unseen_count ?? 0) + 1,
+                    };
+                }
+                return conv;
+            });
+
+            // Sort conversations: chats with newer last_message (or created_at) at the top
+            return [...updated].sort((a, b) => {
+                const timeA = a.last_message ? new Date(a.last_message.created_at).getTime() : 0;
+                const timeB = b.last_message ? new Date(b.last_message.created_at).getTime() : 0;
+                return timeB - timeA;
+            });
         });
     }, []);
 
@@ -60,9 +94,28 @@ const OpportunityChatPage = ({ backHref, backLabel, services }: OpportunityChatP
                 ]);
 
                 if (chatsData.status) {
-                    setConversations(chatsData.data);
-                    if (chatsData.data.length > 0) {
-                        setActiveConv(chatsData.data[0]);
+                    // Sort chats initially by last message date
+                    const sortedChats = [...chatsData.data].sort((a, b) => {
+                        const timeA = a.last_message ? new Date(a.last_message.created_at).getTime() : 0;
+                        const timeB = b.last_message ? new Date(b.last_message.created_at).getTime() : 0;
+                        return timeB - timeA;
+                    });
+
+                    setConversations(sortedChats);
+
+                    // Choose active chat
+                    let initialActive = sortedChats[0] || null;
+                    if (queryChatId) {
+                        const found = sortedChats.find((c) => c.id.toString() === queryChatId);
+                        if (found) {
+                            initialActive = found;
+                        }
+                    }
+                    
+                    if (initialActive) {
+                        // Mark initial active conversation's unseen count to 0 locally
+                        initialActive.unseen_count = 0;
+                        setActiveConv(initialActive);
                     }
                 }
                 setCurrentUser(userData);
@@ -77,7 +130,7 @@ const OpportunityChatPage = ({ backHref, backLabel, services }: OpportunityChatP
             }
         };
         init();
-    }, [services]);
+    }, [services, queryChatId]);
 
     useEffect(() => {
         if (!echoRef.current || conversations.length === 0) return;
@@ -101,15 +154,28 @@ const OpportunityChatPage = ({ backHref, backLabel, services }: OpportunityChatP
         };
     }, [conversations, appendMessage]);
 
+    // Fetch initial chat messages history
     useEffect(() => {
         if (!activeConv) return;
 
         const fetchMessages = async () => {
             setMessages([]);
+            setPage(1);
+            setHasMore(false);
             try {
-                const data = await services.getChatMessages(activeConv.id);
-                if (data?.status && data?.data?.messages?.data) {
-                    setMessages([...data.data.messages.data].reverse());
+                const data = await services.getChatMessages(activeConv.id, 1);
+                if (data?.status) {
+                    let msgList: any[] = [];
+                    if (Array.isArray(data.data?.messages)) {
+                        msgList = data.data.messages;
+                    } else if (data.data?.messages?.data) {
+                        msgList = data.data.messages.data;
+                    } else if (Array.isArray(data.data)) {
+                        msgList = data.data;
+                    }
+                    
+                    setMessages([...msgList].reverse());
+                    setHasMore(data.pagination ? data.pagination.current_page < data.pagination.last_page : false);
                 }
             } catch (error) {
                 console.error("Failed to fetch messages:", error);
@@ -118,6 +184,45 @@ const OpportunityChatPage = ({ backHref, backLabel, services }: OpportunityChatP
 
         fetchMessages();
     }, [activeConv?.id, services]);
+
+    // Load more history messages when scrolling up
+    const handleLoadMore = useCallback(async (prevScrollHeight: number) => {
+        if (!activeConv || loadingMore || !hasMore) return;
+        setLoadingMore(true);
+        const nextPage = page + 1;
+        try {
+            const data = await services.getChatMessages(activeConv.id, nextPage);
+            if (data?.status) {
+                let msgList: any[] = [];
+                if (Array.isArray(data.data?.messages)) {
+                    msgList = data.data.messages;
+                } else if (data.data?.messages?.data) {
+                    msgList = data.data.messages.data;
+                } else if (Array.isArray(data.data)) {
+                    msgList = data.data;
+                }
+
+                if (msgList.length > 0) {
+                    const reversedNew = [...msgList].reverse();
+                    setMessages((prev) => [...reversedNew, ...prev]);
+                    setPage(nextPage);
+                }
+                setHasMore(data.pagination ? data.pagination.current_page < data.pagination.last_page : false);
+            }
+        } catch (error) {
+            console.error("Failed to load more messages:", error);
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [activeConv, page, loadingMore, hasMore, services]);
+
+    // Custom set active conversation wrapper to clear unseen count
+    const handleSetActiveConv = useCallback((conv: Chat) => {
+        setActiveConv(conv);
+        setConversations((prev) =>
+            prev.map((c) => (c.id === conv.id ? { ...c, unseen_count: 0 } : c))
+        );
+    }, []);
 
     const handleSendMessage = useCallback(async () => {
         if ((!messageInput.trim() && !selectedFile) || !activeConv || sending) return;
@@ -132,10 +237,30 @@ const OpportunityChatPage = ({ backHref, backLabel, services }: OpportunityChatP
         try {
             const res = await services.sendMessage(activeConv.id, text, file || undefined);
             if (res.status) {
+                const sentMsg = res.data;
                 setMessages((prev) => {
-                    const exists = prev.some((m) => m.id === res.data.id);
+                    const exists = prev.some((m) => m.id === sentMsg.id);
                     if (exists) return prev;
-                    return [...prev, res.data];
+                    return [...prev, sentMsg];
+                });
+
+                // Update last_message and move to top
+                setConversations((prev) => {
+                    const updated = prev.map((conv) => {
+                        if (conv.id === activeConv.id) {
+                            return {
+                                ...conv,
+                                last_message: sentMsg,
+                                unseen_count: 0,
+                            };
+                        }
+                        return conv;
+                    });
+                    return [...updated].sort((a, b) => {
+                        const timeA = a.last_message ? new Date(a.last_message.created_at).getTime() : 0;
+                        const timeB = b.last_message ? new Date(b.last_message.created_at).getTime() : 0;
+                        return timeB - timeA;
+                    });
                 });
             } else {
                 toast.error(res.message || "Failed to send message");
@@ -183,7 +308,7 @@ const OpportunityChatPage = ({ backHref, backLabel, services }: OpportunityChatP
                 <ChatList
                     conversations={conversations}
                     activeConv={activeConv}
-                    setActiveConv={setActiveConv}
+                    setActiveConv={handleSetActiveConv}
                     searchQuery={searchQuery}
                     setSearchQuery={setSearchQuery}
                 />
@@ -198,6 +323,9 @@ const OpportunityChatPage = ({ backHref, backLabel, services }: OpportunityChatP
                     sending={sending}
                     selectedFile={selectedFile}
                     setSelectedFile={setSelectedFile}
+                    onLoadMore={handleLoadMore}
+                    hasMore={hasMore}
+                    loadingMore={loadingMore}
                 />
             </div>
         </div>

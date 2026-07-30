@@ -52,3 +52,27 @@ export const retryPayment = async (payload: RetryPaymentPayload): Promise<Paymen
         throw error;
     }
 };
+
+export const getPaymentHistory = async (): Promise<any> => {
+    try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_API}/payments`, {
+            method: "GET",
+            headers: await getAuthHeaders(),
+        });
+        return await response.json();
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const getPaymentInvoice = async (paymentId: string | number): Promise<any> => {
+    try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_API}/payments/${paymentId}/invoice`, {
+            method: "GET",
+            headers: await getAuthHeaders(),
+        });
+        return await response.json();
+    } catch (error) {
+        throw error;
+    }
+};

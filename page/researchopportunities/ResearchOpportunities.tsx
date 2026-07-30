@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search, ChevronDown, Filter, Calendar, User, ArrowRight, Loader2 } from "lucide-react";
+import { Search, ChevronDown, Filter, Calendar, User, ArrowRight, Loader2, Users, Infinity, Tag } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { getAllOpportunities, getOpportunityFilterList } from "@/services/home";
@@ -151,7 +151,7 @@ const ResearchOpportunities = ({ initialOpportunities, initialTotal }: ResearchO
                                         {opp.overview}
                                     </p>
 
-                                    <div className="flex flex-col gap-4 mb-8">
+                                    <div className="flex flex-col gap-4 mb-5">
                                         <div className="flex items-center gap-3.5 group/info">
                                             <User className="w-5 h-5 text-[#00D1FF]" strokeWidth={1.5} />
                                             <span className="text-sm font-medium text-[#A3A7AE]">{opp.mentor?.user?.name || "Anonymous Mentor"}</span>
@@ -162,14 +162,41 @@ const ResearchOpportunities = ({ initialOpportunities, initialTotal }: ResearchO
                                         </div>
                                     </div>
 
-                                    <div className="w-full h-px bg-white/5 mb-8" />
+                                    {/* Price & Seats row */}
+                                    <div className="flex items-center justify-between mb-6 px-1">
+                                        {parseFloat(opp.price || "0") === 0 ? (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#2A9D90]/15 border border-[#2A9D90]/30 rounded-full text-[#2A9D90] text-xs font-bold">
+                                                <Tag className="w-3 h-3" /> Free
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 text-white font-bold text-base">
+                                                {parseFloat(opp.price).toFixed(2)}
+                                                <span className="text-[#A3A7AE] text-xs font-medium ml-0.5">SAR</span>
+                                            </span>
+                                        )}
+                                        {opp.available_seats === null ? (
+                                            <span className="inline-flex items-center gap-1.5 text-[#2A9D90] text-xs font-semibold">
+                                                <Infinity className="w-3.5 h-3.5" /> Unlimited
+                                            </span>
+                                        ) : opp.available_seats === 0 ? (
+                                            <span className="inline-flex items-center gap-1.5 text-red-400 text-xs font-semibold">
+                                                <Users className="w-3.5 h-3.5" /> Seats Full
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 text-[#A3A7AE] text-xs font-medium">
+                                                <Users className="w-3.5 h-3.5" /> {opp.available_seats} seats left
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="w-full h-px bg-white/5 mb-6" />
 
                                     <div className="flex items-center gap-3">
                                         <Link
-                                            href={`/researchopportunities/apply/${opp.id}`}
+                                            href={`/researchopportunities/${opp.id}`}
                                             className="flex-[3.5] bg-[#00E5FF] hover:bg-[#00D1FF] text-black font-bold py-2.5 px-6 rounded-lg text-sm transition-all duration-300 flex items-center justify-center gap-2 group/btn active:scale-[0.98]"
                                         >
-                                            Apply Now <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" />
+                                            Enroll Now <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" />
                                         </Link>
                                         <Link
                                             href={`/researchopportunities/${opp.id}`}

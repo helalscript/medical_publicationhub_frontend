@@ -15,6 +15,7 @@ import {
     X,
     FlaskConical,
     ListTodo,
+    CreditCard,
 } from "lucide-react";
 import navLogo from "@/assets/images/nav-logo.png";
 import { ICurrentUser } from "@/types/auth/auth";
@@ -39,6 +40,7 @@ const navItems = [
     { label: "My Courses", href: "/researcher-dashboard/courses", icon: BookOpen },
     { label: "Saved Opportunities", href: "/researcher-dashboard/favourites", icon: Heart },
     { label: "Messages", href: "/researcher-dashboard/conversation", icon: MessageSquare },
+    { label: "Payment History", href: "/researcher-dashboard/payments", icon: CreditCard },
     { label: "Profile Settings", href: "/researcher-dashboard/profile", icon: Settings },
 ];
 
