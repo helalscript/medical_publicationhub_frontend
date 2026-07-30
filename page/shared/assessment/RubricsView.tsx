@@ -133,6 +133,43 @@ const RubricsView = ({ api, portalLabel = "Assessment", isGlobal = false }: Rubr
                 }
             />
 
+            {/* Rubric Explanation Section */}
+            <div className="bg-gradient-to-r from-[#111827] to-[#1F2937] border border-[#6467F2]/20 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[#00D1FF]/5 rounded-full blur-3xl pointer-events-none"></div>
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#6467F2]/5 rounded-full blur-3xl pointer-events-none"></div>
+                
+                <div className="flex items-start gap-4">
+                    <div className="p-3 bg-[#6467F2]/10 rounded-xl text-[#00D1FF] shrink-0 mt-1">
+                        <ClipboardList size={24} className="animate-pulse" />
+                    </div>
+                    <div className="space-y-3">
+                        <h4 className="text-lg font-bold text-white flex items-center gap-2">
+                            What is a Rubric and why is it required?
+                        </h4>
+                        <ul className="space-y-2 text-sm text-[#A3A7AE]">
+                            <li className="flex items-start gap-2.5">
+                                <span className="text-[#00D1FF] font-extrabold mt-0.5">•</span>
+                                <span>
+                                    A <strong>Rubric</strong> is a set of scoring criteria and mark distributions (e.g., Clarity, Methodology) used to evaluate student submissions.
+                                </span>
+                            </li>
+                            <li className="flex items-start gap-2.5">
+                                <span className="text-[#00D1FF] font-extrabold mt-0.5">•</span>
+                                <span>
+                                    In this system, student assignments are automatically assessed by an <strong>AI Agent</strong>. Setting a rubric is mandatory so the AI knows exactly how to grade and distribute marks.
+                                </span>
+                            </li>
+                            <li className="flex items-start gap-2.5">
+                                <span className="text-[#00D1FF] font-extrabold mt-0.5">•</span>
+                                <span>
+                                    Once set, the AI will generate breakdown scores and comments for each criterion, which the mentor can later review and edit from the dashboard.
+                                </span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
             {loading ? (
                 <div className="flex justify-center py-20">
                     <Loader2 className="w-8 h-8 text-[#00D1FF] animate-spin" />

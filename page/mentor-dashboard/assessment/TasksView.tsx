@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Loader2, X, Calendar, ListTodo } from "lucide-react";
+import { Plus, Loader2, X, Calendar, ListTodo, Info } from "lucide-react";
 import { toast } from "sonner";
 import CoordinatorPageHeader from "@/page/coordinator-dashboard/components/CoordinatorPageHeader";
 import StatusBadge from "@/page/shared/assessment/StatusBadge";
@@ -15,6 +15,7 @@ const TasksView = () => {
     const [rubrics, setRubrics] = useState<Rubric[]>([]);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
+    const [showRubricInfo, setShowRubricInfo] = useState(false);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({
         title: "",
@@ -165,26 +166,57 @@ const TasksView = () => {
                                     rows={3}
                                     className="w-full px-4 py-3 bg-[#1F242D] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00D1FF]/30 resize-none"
                                 />
-                                <select
-                                    value={form.rubric_id}
-                                    onChange={(e) => setForm({ ...form, rubric_id: e.target.value })}
-                                    required
-                                    className="w-full px-4 py-3 bg-[#1F242D] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00D1FF]/30"
-                                >
-                                    <option value="">Select rubric</option>
-                                    {rubrics.map((r) => (
-                                        <option key={r.id} value={r.id}>
-                                            {r.title}{r.is_global ? " (Global)" : ""}
-                                        </option>
-                                    ))}
-                                </select>
-                                <input
-                                    type="datetime-local"
-                                    value={form.deadline}
-                                    onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-                                    required
-                                    className="w-full px-4 py-3 bg-[#1F242D] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00D1FF]/30"
-                                />
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        value={form.rubric_id}
+                                        onChange={(e) => setForm({ ...form, rubric_id: e.target.value })}
+                                        required
+                                        className="flex-1 px-4 py-3 bg-[#1F242D] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00D1FF]/30"
+                                    >
+                                        <option value="">Select rubric</option>
+                                        {rubrics.map((r) => (
+                                            <option key={r.id} value={r.id}>
+                                                {r.title}{r.is_global ? " (Global)" : ""}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowRubricInfo(!showRubricInfo)}
+                                        className={`p-3 rounded-xl border transition-all ${
+                                            showRubricInfo
+                                                ? "bg-[#00D1FF]/10 border-[#00D1FF] text-[#00D1FF]"
+                                                : "bg-[#1F242D] border-white/10 text-[#A3A7AE] hover:text-white"
+                                        }`}
+                                        title="What is a Rubric?"
+                                    >
+                                        <Info size={18} />
+                                    </button>
+                                </div>
+
+                                {showRubricInfo && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: "auto" }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className="p-4 bg-[#1F242D] border border-[#6467F2]/20 rounded-xl space-y-2 text-xs text-[#A3A7AE] overflow-hidden"
+                                    >
+                                        <p className="font-bold text-white text-xs">What is a Rubric and why is it required?</p>
+                                        <p className="leading-relaxed">• A <strong>Rubric</strong> is a set of scoring criteria and mark distributions (e.g., Clarity, Methodology) used to evaluate student submissions.</p>
+                                        <p className="leading-relaxed">• In this system, student assignments are automatically assessed by an <strong>AI Agent</strong>. Setting a rubric is mandatory so the AI knows exactly how to grade and distribute marks.</p>
+                                        <p className="leading-relaxed">• Once set, the AI will generate breakdown scores and comments for each criterion, which the mentor can later review and edit from the dashboard.</p>
+                                    </motion.div>
+                                )}
+                                <div className="space-y-1">
+                                    <label className="text-xs font-semibold text-[#A3A7AE] uppercase tracking-wider block ml-1">Submission Deadline</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={form.deadline}
+                                        onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+                                        required
+                                        className="w-full px-4 py-3 bg-[#1F242D] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00D1FF]/30"
+                                    />
+                                </div>
                                 <input
                                     placeholder="Tutorial video URL (optional)"
                                     value={form.video_url}

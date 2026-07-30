@@ -1,5 +1,16 @@
-export const isApiSuccess = (res: { status?: boolean; success?: boolean } | null | undefined) =>
-    Boolean(res?.status || res?.success);
+export const isApiSuccess = (res: any) => {
+    if (!res) return false;
+    if (res.status === true || res.success === true || res.status === "success" || res.success === "success") {
+        return true;
+    }
+    if (typeof res.code === "number" && res.code >= 200 && res.code < 300) {
+        return true;
+    }
+    if ((res.id || res.message) && !res.error && !res.errors) {
+        return true;
+    }
+    return false;
+};
 
 export const extractList = <T>(res: { data?: T[] | { data?: T[] } } | null | undefined): T[] => {
     if (!res?.data) return [];
