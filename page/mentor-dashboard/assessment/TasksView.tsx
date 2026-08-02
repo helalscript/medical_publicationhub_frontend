@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Loader2, X, Calendar, ListTodo, Info } from "lucide-react";
 import { toast } from "sonner";
@@ -8,11 +9,15 @@ import CoordinatorPageHeader from "@/page/coordinator-dashboard/components/Coord
 import StatusBadge from "@/page/shared/assessment/StatusBadge";
 import { extractList, formatDate, isApiSuccess } from "@/page/shared/assessment/utils";
 import { createMentorTask, getMentorRubrics, getMentorTasks } from "@/services/mentor/assessment";
+import { getChats } from "@/services/mentor/index";
 import type { MentorTask, Rubric } from "@/types/assessment";
+import type { Chat } from "@/types/chat";
 
 const TasksView = () => {
     const [tasks, setTasks] = useState<MentorTask[]>([]);
     const [rubrics, setRubrics] = useState<Rubric[]>([]);
+    const [chats, setChats] = useState<Chat[]>([]);
+    const [formFile, setFormFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [showRubricInfo, setShowRubricInfo] = useState(false);
@@ -23,14 +28,24 @@ const TasksView = () => {
         rubric_id: "",
         deadline: "",
         video_url: "",
+        opportunity_id: "",
+        assign_type: "all",
+        researcher_ids: [] as number[],
     });
 
     const load = async () => {
         setLoading(true);
         try {
-            const [tasksRes, rubricsRes] = await Promise.all([getMentorTasks(), getMentorRubrics()]);
+            const [tasksRes, rubricsRes, chatsRes] = await Promise.all([
+                getMentorTasks(),
+                getMentorRubrics(),
+                getChats(),
+            ]);
             setTasks(extractList<MentorTask>(tasksRes));
             setRubrics(extractList<Rubric>(rubricsRes));
+            if (chatsRes && chatsRes.status && Array.isArray(chatsRes.data)) {
+                setChats(chatsRes.data);
+            }
         } catch {
             toast.error("Failed to load tasks");
         } finally {
@@ -44,26 +59,55 @@ const TasksView = () => {
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.rubric_id) {
-            toast.error("Please select a rubric");
+        if (!form.opportunity_id) {
+            toast.error("Please select a research opportunity");
+            return;
+        }
+        if (form.assign_type === "specific" && form.researcher_ids.length === 0) {
+            toast.error("Please select at least one researcher");
             return;
         }
         setSaving(true);
         try {
-            const res = await createMentorTask({
-                title: form.title.trim(),
-                description: form.description.trim(),
-                rubric_id: Number(form.rubric_id),
-                deadline: form.deadline,
-                video_url: form.video_url.trim() || undefined,
-            });
+            const formData = new FormData();
+            formData.append("title", form.title.trim());
+            formData.append("description", form.description.trim());
+            if (form.rubric_id) {
+                formData.append("rubric_id", String(form.rubric_id));
+            }
+            formData.append("deadline", form.deadline);
+            if (form.video_url.trim()) {
+                formData.append("video_url", form.video_url.trim());
+            }
+            formData.append("opportunity_id", String(form.opportunity_id));
+            formData.append("assign_type", form.assign_type);
+            if (form.assign_type === "specific") {
+                form.researcher_ids.forEach((id) => {
+                    formData.append("researcher_ids[]", String(id));
+                });
+            }
+            if (formFile) {
+                formData.append("document", formFile);
+            }
+
+            const res = await createMentorTask(formData);
             if (isApiSuccess(res)) {
                 toast.success("Task created");
                 setModalOpen(false);
-                setForm({ title: "", description: "", rubric_id: "", deadline: "", video_url: "" });
+                setFormFile(null);
+                setForm({
+                    title: "",
+                    description: "",
+                    rubric_id: "",
+                    deadline: "",
+                    video_url: "",
+                    opportunity_id: "",
+                    assign_type: "all",
+                    researcher_ids: [],
+                });
                 load();
             } else {
-                toast.error(res?.message || "Failed to create task");
+                toast.error((res as { message?: string })?.message || "Failed to create task");
             }
         } catch {
             toast.error("Failed to create task");
@@ -100,31 +144,48 @@ const TasksView = () => {
                 </div>
             ) : (
                 <div className="space-y-3">
-                    {tasks.map((task) => (
-                        <motion.div
-                            key={task.id}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="bg-[#111827] border border-white/5 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-white/10 transition-all"
-                        >
-                            <div className="min-w-0">
-                                <div className="flex items-center gap-3 mb-1">
-                                    <h3 className="text-white font-bold truncate">{task.title}</h3>
-                                    {task.status && <StatusBadge status={task.status} />}
-                                </div>
-                                <p className="text-[#A3A7AE] text-sm line-clamp-1">{task.description}</p>
-                                <div className="flex items-center gap-2 mt-2 text-xs text-[#64748B]">
-                                    <Calendar size={14} />
-                                    Deadline: {formatDate(task.deadline)}
-                                </div>
-                            </div>
-                            {task.rubric && (
-                                <span className="text-xs font-bold text-[#00D1FF] bg-[#00D1FF]/10 px-3 py-1.5 rounded-full shrink-0">
-                                    {task.rubric.title}
-                                </span>
-                            )}
-                        </motion.div>
-                    ))}
+                    {tasks.map((task) => {
+                        const totalAssignments = task.assignments?.length || 0;
+                        const submittedCount = task.assignments?.filter((a: any) => a.status !== "pending").length || 0;
+                        return (
+                            <Link href={`/mentor-dashboard/tasks/${task.id}`} key={task.id} className="block">
+                                <motion.div
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-[#111827] border border-white/5 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-white/10 hover:border-[#00D1FF]/20 transition-all"
+                                >
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-3 mb-1">
+                                            <h3 className="text-white font-bold truncate">{task.title}</h3>
+                                            {task.status && <StatusBadge status={task.status} />}
+                                        </div>
+                                        <p className="text-[#A3A7AE] text-sm line-clamp-1">{task.description}</p>
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-xs text-[#64748B]">
+                                            <div className="flex items-center gap-1">
+                                                <Calendar size={14} />
+                                                Deadline: {formatDate(task.deadline)}
+                                            </div>
+                                            {task.opportunity && (
+                                                <div className="text-[#00D1FF]/80 font-medium">
+                                                    Opportunity: {task.opportunity.title}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className="text-xs font-bold bg-[#6467F2]/10 text-[#9C8BE9] border border-[#6467F2]/25 px-3 py-1.5 rounded-full">
+                                            Submissions: {submittedCount} / {totalAssignments}
+                                        </span>
+                                        {task.rubric && (
+                                            <span className="text-xs font-bold text-[#00D1FF] bg-[#00D1FF]/10 px-3 py-1.5 rounded-full">
+                                                {task.rubric.title}
+                                            </span>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            </Link>
+                        );
+                    })}
                 </div>
             )}
 
@@ -166,6 +227,71 @@ const TasksView = () => {
                                     rows={3}
                                     className="w-full px-4 py-3 bg-[#1F242D] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00D1FF]/30 resize-none"
                                 />
+                                <select
+                                    value={form.opportunity_id}
+                                    onChange={(e) => setForm({ ...form, opportunity_id: e.target.value, researcher_ids: [] })}
+                                    required
+                                    className="w-full px-4 py-3 bg-[#1F242D] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00D1FF]/30"
+                                >
+                                    <option value="">Select Research Opportunity</option>
+                                    {chats
+                                        .map((c) => c.chatable)
+                                        .filter(Boolean)
+                                        .filter((opp, idx, self) => self.findIndex((o) => o?.id === opp?.id) === idx)
+                                        .map((opp) => (
+                                            <option key={opp.id} value={opp.id}>
+                                                {opp.title}
+                                            </option>
+                                        ))
+                                    }
+                                </select>
+
+                                <select
+                                    value={form.assign_type}
+                                    onChange={(e) => setForm({ ...form, assign_type: e.target.value, researcher_ids: [] })}
+                                    required
+                                    className="w-full px-4 py-3 bg-[#1F242D] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00D1FF]/30"
+                                >
+                                    <option value="all">All Enrolled Researchers</option>
+                                    <option value="specific">Specific Researchers</option>
+                                </select>
+
+                                {form.assign_type === "specific" && form.opportunity_id && (() => {
+                                    const selectedChat = chats.find((c) => c.chatable?.id === Number(form.opportunity_id));
+                                    const researchers = selectedChat?.users
+                                        ?.filter((cu) => cu.user && cu.user.role?.toLowerCase() === "researcher")
+                                        ?.map((cu) => cu.user)
+                                        ?.filter(Boolean) || [];
+                                    return (
+                                        <div className="space-y-2 max-h-[160px] overflow-y-auto p-3 bg-[#1F242D] border border-white/10 rounded-xl">
+                                            <label className="text-[10px] font-semibold text-[#A3A7AE] uppercase tracking-wider block mb-1">Select Researchers</label>
+                                            {researchers.length === 0 ? (
+                                                <p className="text-xs text-[#64748B]">No researchers enrolled in this group.</p>
+                                            ) : (
+                                                researchers.map((res) => {
+                                                    const checked = form.researcher_ids.includes(res.id);
+                                                    return (
+                                                        <label key={res.id} className="flex items-center gap-3 text-sm text-white cursor-pointer select-none py-1 hover:text-[#00D1FF] transition-colors">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={checked}
+                                                                onChange={() => {
+                                                                    const updated = checked
+                                                                        ? form.researcher_ids.filter((id) => id !== res.id)
+                                                                        : [...form.researcher_ids, res.id];
+                                                                    setForm({ ...form, researcher_ids: updated });
+                                                                }}
+                                                                className="rounded bg-[#1F242D] border-white/10 text-[#00D1FF] focus:ring-[#00D1FF]/30"
+                                                            />
+                                                            <span>{res.name}</span>
+                                                        </label>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+
                                 <div className="flex items-center gap-2">
                                     <select
                                         value={form.rubric_id}
@@ -222,7 +348,20 @@ const TasksView = () => {
                                     value={form.video_url}
                                     onChange={(e) => setForm({ ...form, video_url: e.target.value })}
                                     className="w-full px-4 py-3 bg-[#1F242D] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00D1FF]/30"
+                                    type="url"
                                 />
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-semibold text-[#A3A7AE] uppercase tracking-wider block ml-1">Task Document (Optional)</label>
+                                    <input
+                                        type="file"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0] || null;
+                                            setFormFile(file);
+                                        }}
+                                        className="w-full px-4 py-2 bg-[#1F242D] border border-white/10 rounded-xl text-white text-xs focus:outline-none focus:ring-2 focus:ring-[#00D1FF]/30 file:mr-3 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-[#00D1FF]/10 file:text-[#00D1FF] file:cursor-pointer file:transition-all hover:file:bg-[#00D1FF]/20"
+                                    />
+                                    <p className="text-[10px] text-[#64748B] ml-1">Note: Max file size is 10 MB. Supported formats: PDF, DOC, DOCX, ZIP, etc.</p>
+                                </div>
                                 <button
                                     type="submit"
                                     disabled={saving}

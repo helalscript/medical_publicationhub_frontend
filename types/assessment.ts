@@ -31,6 +31,8 @@ export interface ResearcherTask {
     description?: string;
     video_url?: string;
     submission_id?: number;
+    document_path?: string;
+    document_name?: string;
 }
 
 export interface MentorTask {
@@ -44,14 +46,22 @@ export interface MentorTask {
     status?: string;
     mentor_name?: string;
     created_at?: string;
+    opportunity_id?: number;
+    opportunity?: { id: number; title: string };
+    assignments?: { id: number; status: string; researcher_id: number }[];
+    document_path?: string;
+    document_name?: string;
 }
 
 export interface MentorTaskPayload {
     title: string;
     description: string;
-    rubric_id: number;
+    rubric_id?: number;
     deadline: string;
     video_url?: string;
+    opportunity_id: number;
+    assign_type: string;
+    researcher_ids: number[];
 }
 
 export interface SubmissionInboxItem {

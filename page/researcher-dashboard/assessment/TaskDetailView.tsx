@@ -11,6 +11,55 @@ import { getResearcherSubmissionFeedback, getResearcherTasks, submitResearcherTa
 import type { ResearcherTask, SubmissionFeedback } from "@/types/assessment";
 import ResearcherFeedbackPanel from "@/page/shared/assessment/ResearcherFeedbackPanel";
 
+const CountdownTimer = ({ deadline }: { deadline: string }) => {
+    const [timeLeft, setTimeLeft] = useState("");
+    const [isEnded, setIsEnded] = useState(false);
+
+    useEffect(() => {
+        const calculateTimeLeft = () => {
+            const difference = +new Date(deadline) - +new Date();
+            if (difference <= 0) {
+                setTimeLeft("Time ended");
+                setIsEnded(true);
+                return;
+            }
+
+            const secs = Math.floor(difference / 1000);
+            const mins = Math.floor(secs / 60);
+            const hours = Math.floor(mins / 60);
+            const days = Math.floor(hours / 24);
+
+            const d = days > 0 ? `${days}d ` : "";
+            const h = String(hours % 24).padStart(2, "0");
+            const m = String(mins % 60).padStart(2, "0");
+            const s = String(secs % 60).padStart(2, "0");
+
+            setTimeLeft(`${d}${h}h ${m}m ${s}s`);
+            setIsEnded(false);
+        };
+
+        calculateTimeLeft();
+        const timer = setInterval(calculateTimeLeft, 1000);
+
+        return () => clearInterval(timer);
+    }, [deadline]);
+
+    return (
+        <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${
+            isEnded
+                ? "bg-red-500/10 border-red-500/20 text-red-400"
+                : "bg-[#00D1FF]/5 border-[#00D1FF]/20 text-[#00D1FF]"
+        }`}>
+            <span className="text-[10px] uppercase font-bold tracking-wider opacity-70">
+                {isEnded ? "Deadline Status" : "Time Remaining"}
+            </span>
+            <span className="text-2xl font-mono font-bold mt-1.5">
+                {timeLeft}
+            </span>
+        </div>
+    );
+};
+
 const TaskDetailView = () => {
     const { id } = useParams();
     const assignmentId = Number(id);
@@ -112,25 +161,47 @@ const TaskDetailView = () => {
                 <ArrowLeft size={16} /> Back to Tasks
             </Link>
 
-            <div className="bg-[#111827] border border-white/5 rounded-2xl p-6 sm:p-8">
-                <div className="flex flex-wrap items-center gap-3 mb-4">
-                    <h1 className="text-2xl font-bold text-white">{task.title}</h1>
-                    <StatusBadge status={task.status} />
-                </div>
-                <p className="text-xs text-[#64748B] mb-4">Deadline: {formatDate(task.deadline)}</p>
-                {task.description && (
-                    <p className="text-[#A3A7AE] text-sm leading-relaxed mb-6">{task.description}</p>
-                )}
-                {task.video_url && (
-                    <div className="mb-6 rounded-xl overflow-hidden border border-white/10 aspect-video bg-black">
-                        <iframe
-                            src={toEmbedVideoUrl(task.video_url)}
-                            title="Tutorial"
-                            className="w-full h-full"
-                            allowFullScreen
-                        />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 bg-[#111827] border border-white/5 rounded-2xl p-6 sm:p-8 space-y-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <h1 className="text-2xl font-bold text-white">{task.title}</h1>
+                        <StatusBadge status={task.status} />
                     </div>
-                )}
+                    <p className="text-xs text-[#64748B]">Deadline: {formatDate(task.deadline)}</p>
+                    <hr className="border-white/5" />
+                    {task.description && (
+                        <p className="text-[#A3A7AE] text-sm leading-relaxed whitespace-pre-line">{task.description}</p>
+                    )}
+                    {task.document_path && (
+                        <div>
+                            <h4 className="text-white font-semibold text-xs mb-2">Task Document</h4>
+                            <a
+                                href={task.document_path}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#1F242D] border border-white/10 hover:border-[#00D1FF]/30 rounded-xl text-xs font-semibold text-[#00D1FF] transition-all"
+                            >
+                                <FileText size={14} />
+                                {task.document_name || "Download Document"}
+                            </a>
+                        </div>
+                    )}
+                    {task.video_url && (
+                        <div className="rounded-xl overflow-hidden border border-white/10 aspect-video bg-black max-w-2xl">
+                            <iframe
+                                src={toEmbedVideoUrl(task.video_url)}
+                                title="Tutorial"
+                                className="w-full h-full"
+                                allowFullScreen
+                            />
+                        </div>
+                    )}
+                </div>
+
+                <div className="bg-[#111827] border border-white/5 rounded-2xl p-6 h-fit space-y-4">
+                    <h3 className="text-white font-bold text-sm">Remaining Time</h3>
+                    <CountdownTimer deadline={task.deadline} />
+                </div>
             </div>
 
             {task.status === "approved" && feedback && (

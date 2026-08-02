@@ -61,11 +61,29 @@ export const getMentorTasks = async () => {
     return response.json();
 };
 
-export const createMentorTask = async (payload: MentorTaskPayload) => {
+export const getMentorTaskById = async (id: number | string) => {
+    const response = await fetch(`${base()}/mentor/tasks/${id}`, {
+        method: "GET",
+        headers: await getAuthHeaders(),
+    });
+    return response.json();
+};
+
+export const createMentorTask = async (payload: MentorTaskPayload | FormData) => {
+    const isFormData = payload instanceof FormData;
     const response = await fetch(`${base()}/mentor/tasks`, {
         method: "POST",
+        headers: await getAuthHeaders(!isFormData),
+        body: isFormData ? payload : JSON.stringify(payload),
+    });
+    return response.json();
+};
+
+export const assignResearchersToTask = async (taskId: number, researcherIds: number[]) => {
+    const response = await fetch(`${base()}/mentor/tasks/${taskId}/assign`, {
+        method: "POST",
         headers: await getAuthHeaders(true),
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ researcher_ids: researcherIds }),
     });
     return response.json();
 };

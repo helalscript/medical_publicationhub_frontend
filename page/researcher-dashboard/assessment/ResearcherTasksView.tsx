@@ -8,24 +8,107 @@ import CoordinatorPageHeader from "@/page/coordinator-dashboard/components/Coord
 import StatusBadge from "@/page/shared/assessment/StatusBadge";
 import { extractList, formatDate, isOverdue } from "@/page/shared/assessment/utils";
 import { getResearcherTasks } from "@/services/researcher/assessment";
+import { getCurrentUser, getToken } from "@/services/auth";
+import initEcho from "@/lib/echo";
 import type { ResearcherTask } from "@/types/assessment";
+
+export const getDueTimeLabel = (deadlineStr: string) => {
+    const deadline = new Date(deadlineStr);
+    const now = new Date();
+    const diffMs = deadline.getTime() - now.getTime();
+    if (diffMs <= 0) {
+        return "Time ended";
+    }
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays > 0) {
+        return `${diffDays}d ${diffHours % 24}h left`;
+    }
+    if (diffHours > 0) {
+        return `${diffHours}h ${diffMins % 60}m left`;
+    }
+    if (diffMins > 0) {
+        return `${diffMins}m ${diffSecs % 60}s left`;
+    }
+    return `${diffSecs}s left`;
+};
 
 const ResearcherTasksView = () => {
     const [tasks, setTasks] = useState<ResearcherTask[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const load = async () => {
+        try {
+            const res = await getResearcherTasks();
+            setTasks(extractList<ResearcherTask>(res));
+        } catch {
+            toast.error("Failed to load tasks");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const load = async () => {
+        load();
+
+        let echoInstance: any = null;
+
+        const setupEcho = async () => {
             try {
-                const res = await getResearcherTasks();
-                setTasks(extractList<ResearcherTask>(res));
-            } catch {
-                toast.error("Failed to load tasks");
-            } finally {
-                setLoading(false);
+                const [user, token] = await Promise.all([getCurrentUser(), getToken()]);
+                if (!user || !token) return;
+
+                echoInstance = initEcho(token);
+                if (!echoInstance) return;
+
+                echoInstance
+                    .private(`App.Models.User.${user.id}`)
+                    .listen(".task.assigned", (event: any) => {
+                        toast.success(`New Task Assigned: ${event.task?.title || ""}`);
+                        setTasks((prev) => {
+                            const exists = prev.some(
+                                (t) => t.id === event.task?.id || t.task_id === event.task?.id
+                            );
+                            if (exists) return prev;
+
+                            const newTask: ResearcherTask = {
+                                id: event.task?.id,
+                                task_id: event.task?.id,
+                                title: event.task?.title || "",
+                                deadline: event.task?.deadline || "",
+                                status: "pending",
+                                is_notified: true,
+                                description: event.task?.description,
+                                video_url: event.task?.video_url,
+                            };
+                            return [newTask, ...prev];
+                        });
+                    })
+                    .notification((notification: any) => {
+                        if (notification.type === "task_assigned" || notification.type === "App\\Notifications\\TaskAssignedNotification") {
+                            toast.info(notification.message || "You have been assigned a new task!");
+                            load();
+                        }
+                    });
+            } catch (err) {
+                console.error("Echo connection error in researcher tasks:", err);
             }
         };
-        load();
+
+        setupEcho();
+
+        return () => {
+            if (echoInstance) {
+                getCurrentUser().then((user) => {
+                    if (user) {
+                        echoInstance.leave(`App.Models.User.${user.id}`);
+                    }
+                });
+            }
+        };
     }, []);
 
     return (
@@ -70,7 +153,12 @@ const ResearcherTasksView = () => {
                                             <StatusBadge status={task.status} />
                                         </div>
                                     </div>
-                                    <p className="text-xs text-[#64748B] mb-3">Deadline: {formatDate(task.deadline)}</p>
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#64748B] mb-3">
+                                        <span>Deadline: {formatDate(task.deadline)}</span>
+                                        <span className={`font-bold ${isOverdue(task.deadline) ? "text-red-400" : "text-[#00D1FF]"}`}>
+                                            {getDueTimeLabel(task.deadline)}
+                                        </span>
+                                    </div>
                                     {(overdue || rejected) && (
                                         <p className="flex items-center gap-1.5 text-xs text-red-400 font-medium">
                                             <AlertCircle size={14} />
