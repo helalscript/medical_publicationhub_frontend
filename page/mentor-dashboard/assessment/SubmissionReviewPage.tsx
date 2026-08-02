@@ -30,7 +30,9 @@ const SubmissionReviewPage = () => {
         const load = async () => {
             try {
                 const res = await getMentorSubmissionFeedback(submissionId);
+                console.log("DEBUG: Mentor submission feedback raw response:", res);
                 const fb = extractFeedback<SubmissionFeedback>(res);
+                console.log("DEBUG: Mapped feedback object:", fb);
                 setFeedback(fb);
                 if (fb) {
                     setScoreOverride(String(fb.mentor_score_override ?? fb.overall_score ?? ""));
@@ -151,6 +153,12 @@ const SubmissionReviewPage = () => {
                         scores={feedback.rubric_scores || []}
                         overallScore={feedback.ai_overall_score ?? feedback.overall_score}
                     />
+                    {feedback.ai_general_feedback && (
+                        <div className="p-4 rounded-xl bg-[#1F242D]/60 border border-white/5">
+                            <p className="text-xs font-bold text-[#64748B] uppercase mb-1.5">AI General Comments</p>
+                            <p className="text-sm text-[#A3A7AE] leading-relaxed">{feedback.ai_general_feedback}</p>
+                        </div>
+                    )}
                     {feedback.flagged_issues && feedback.flagged_issues.length > 0 && (
                         <div className="space-y-2">
                             <p className="text-xs font-bold text-amber-500 uppercase tracking-wider flex items-center gap-1.5">

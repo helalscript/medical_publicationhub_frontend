@@ -7,7 +7,7 @@ import { ArrowLeft, Loader2, Calendar, FileText, Play, CheckCircle2, AlertTriang
 import { toast } from "sonner";
 import { getMentorTaskById, assignResearchersToTask } from "@/services/mentor/assessment";
 import { getChats } from "@/services/mentor/index";
-import { extractData, formatDate, toEmbedVideoUrl, isApiSuccess } from "@/page/shared/assessment/utils";
+import { extractData, formatDate, toEmbedVideoUrl, isApiSuccess, downloadFile } from "@/page/shared/assessment/utils";
 import StatusBadge from "@/page/shared/assessment/StatusBadge";
 import type { Chat } from "@/types/chat";
 
@@ -121,15 +121,13 @@ const MentorTaskDetailPage = () => {
                         {task.document_path && (
                             <div className="space-y-2">
                                 <h3 className="text-white font-semibold text-sm">Task Attachment</h3>
-                                <a
-                                    href={task.document_path}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                <button
+                                    onClick={() => downloadFile(task.document_path, task.document_name || "task_document")}
                                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#1F242D] border border-white/10 hover:border-[#00D1FF]/30 rounded-xl text-xs font-semibold text-[#00D1FF] transition-all"
                                 >
                                     <FileText size={14} />
                                     {task.document_name || "Download Document"}
-                                </a>
+                                </button>
                             </div>
                         )}
 

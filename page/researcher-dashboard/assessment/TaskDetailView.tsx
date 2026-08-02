@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { ArrowLeft, Loader2, Upload, FileText } from "lucide-react";
 import { toast } from "sonner";
 import StatusBadge from "@/page/shared/assessment/StatusBadge";
-import { extractFeedback, extractList, formatDate, isApiSuccess, toEmbedVideoUrl } from "@/page/shared/assessment/utils";
+import { extractFeedback, extractList, formatDate, isApiSuccess, toEmbedVideoUrl, downloadFile } from "@/page/shared/assessment/utils";
 import { getResearcherSubmissionFeedback, getResearcherTasks, submitResearcherTask } from "@/services/researcher/assessment";
 import type { ResearcherTask, SubmissionFeedback } from "@/types/assessment";
 import ResearcherFeedbackPanel from "@/page/shared/assessment/ResearcherFeedbackPanel";
@@ -175,15 +175,13 @@ const TaskDetailView = () => {
                     {task.document_path && (
                         <div>
                             <h4 className="text-white font-semibold text-xs mb-2">Task Document</h4>
-                            <a
-                                href={task.document_path}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                            <button
+                                onClick={() => downloadFile(task.document_path!, task.document_name || "task_document")}
                                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#1F242D] border border-white/10 hover:border-[#00D1FF]/30 rounded-xl text-xs font-semibold text-[#00D1FF] transition-all"
                             >
                                 <FileText size={14} />
                                 {task.document_name || "Download Document"}
-                            </a>
+                            </button>
                         </div>
                     )}
                     {task.video_url && (
@@ -246,11 +244,11 @@ const TaskDetailView = () => {
                             <label className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-white/10 rounded-xl cursor-pointer hover:border-[#7661FF]/40 transition-colors">
                                 <Upload className="w-8 h-8 text-[#7661FF]" />
                                 <span className="text-sm text-[#A3A7AE]">
-                                    {file ? file.name : "Upload .docx or .xlsx file"}
+                                    {file ? file.name : "Upload .docx, .xlsx or .pdf file"}
                                 </span>
                                 <input
                                     type="file"
-                                    accept=".docx,.xlsx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                    accept=".docx,.xlsx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf"
                                     className="hidden"
                                     onChange={(e) => setFile(e.target.files?.[0] || null)}
                                 />

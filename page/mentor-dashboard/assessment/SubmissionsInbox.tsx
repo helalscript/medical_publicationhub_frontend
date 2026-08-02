@@ -34,7 +34,7 @@ const SubmissionsInbox = () => {
         const matchesTab = activeTab === "all" || s.status === activeTab;
         const q = search.toLowerCase();
         const matchesSearch =
-            s.researcher_name.toLowerCase().includes(q) ||
+            (s.researcher_name || "").toLowerCase().includes(q) ||
             (s.task_name || s.task_title || "").toLowerCase().includes(q);
         return matchesTab && matchesSearch;
     });

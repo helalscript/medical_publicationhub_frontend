@@ -85,6 +85,7 @@ export interface SubmissionFeedback {
     feedback_id?: number;
     overall_score: number;
     mentor_comments?: string;
+    ai_general_feedback?: string;
     mentor_score_override?: number;
     mentor_comments_override?: string;
     rubric_scores: RubricScore[];

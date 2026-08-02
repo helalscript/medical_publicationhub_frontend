@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Loader2, X, Calendar, ListTodo, Info } from "lucide-react";
+import { Plus, Loader2, X, Calendar, ListTodo, Info, Search } from "lucide-react";
 import { toast } from "sonner";
 import CoordinatorPageHeader from "@/page/coordinator-dashboard/components/CoordinatorPageHeader";
 import StatusBadge from "@/page/shared/assessment/StatusBadge";
@@ -22,6 +22,8 @@ const TasksView = () => {
     const [modalOpen, setModalOpen] = useState(false);
     const [showRubricInfo, setShowRubricInfo] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [search, setSearch] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
     const [form, setForm] = useState({
         title: "",
         description: "",
@@ -116,6 +118,23 @@ const TasksView = () => {
         }
     };
 
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search]);
+
+    const filteredTasks = tasks.filter((t) => {
+        const q = search.toLowerCase();
+        return (
+            t.title.toLowerCase().includes(q) ||
+            (t.description || "").toLowerCase().includes(q) ||
+            (t.opportunity?.title || "").toLowerCase().includes(q)
+        );
+    });
+
+    const itemsPerPage = 8;
+    const totalPages = Math.ceil(filteredTasks.length / itemsPerPage);
+    const paginatedTasks = filteredTasks.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
     return (
         <div className="max-w-[1400px] mx-auto w-full space-y-6">
             <CoordinatorPageHeader
@@ -132,6 +151,18 @@ const TasksView = () => {
                 }
             />
 
+            <div className="flex bg-[#111827] border border-white/5 rounded-2xl p-4 items-center justify-between gap-4">
+                <div className="relative w-full sm:w-80">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+                    <input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search tasks..."
+                        className="w-full pl-10 pr-4 py-2.5 bg-[#1F2937]/50 border border-white/5 rounded-xl text-sm text-white placeholder:text-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#00D1FF]/30"
+                    />
+                </div>
+            </div>
+
             {loading ? (
                 <div className="flex justify-center py-20">
                     <Loader2 className="w-8 h-8 text-[#00D1FF] animate-spin" />
@@ -142,50 +173,93 @@ const TasksView = () => {
                     <p className="text-white font-semibold mb-1">No tasks assigned yet</p>
                     <p className="text-[#A3A7AE] text-sm">Create a task to assign work to researchers.</p>
                 </div>
+            ) : filteredTasks.length === 0 ? (
+                <div className="bg-[#111827] border border-white/5 rounded-2xl p-12 text-center">
+                    <Search className="w-12 h-12 text-[#64748B] mx-auto mb-4" />
+                    <p className="text-white font-semibold mb-1">No matching tasks found</p>
+                    <p className="text-[#A3A7AE] text-sm">Try modifying your search criteria.</p>
+                </div>
             ) : (
-                <div className="space-y-3">
-                    {tasks.map((task) => {
-                        const totalAssignments = task.assignments?.length || 0;
-                        const submittedCount = task.assignments?.filter((a: any) => a.status !== "pending").length || 0;
-                        return (
-                            <Link href={`/mentor-dashboard/tasks/${task.id}`} key={task.id} className="block">
-                                <motion.div
-                                    initial={{ opacity: 0, y: 8 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="bg-[#111827] border border-white/5 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-white/10 hover:border-[#00D1FF]/20 transition-all"
-                                >
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-3 mb-1">
-                                            <h3 className="text-white font-bold truncate">{task.title}</h3>
-                                            {task.status && <StatusBadge status={task.status} />}
-                                        </div>
-                                        <p className="text-[#A3A7AE] text-sm line-clamp-1">{task.description}</p>
-                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-xs text-[#64748B]">
-                                            <div className="flex items-center gap-1">
-                                                <Calendar size={14} />
-                                                Deadline: {formatDate(task.deadline)}
+                <div className="space-y-4">
+                    <div className="space-y-3">
+                        {paginatedTasks.map((task) => {
+                            const totalAssignments = task.assignments?.length || 0;
+                            const submittedCount = task.assignments?.filter((a: any) => a.status !== "pending").length || 0;
+                            return (
+                                <Link href={`/mentor-dashboard/tasks/${task.id}`} key={task.id} className="block">
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 8 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="bg-[#111827] border border-white/5 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-white/10 hover:border-[#00D1FF]/20 transition-all"
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-3 mb-1">
+                                                <h3 className="text-white font-bold truncate">{task.title}</h3>
+                                                {task.status && <StatusBadge status={task.status} />}
                                             </div>
-                                            {task.opportunity && (
-                                                <div className="text-[#00D1FF]/80 font-medium">
-                                                    Opportunity: {task.opportunity.title}
+                                            <p className="text-[#A3A7AE] text-sm line-clamp-1">{task.description}</p>
+                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-xs text-[#64748B]">
+                                                <div className="flex items-center gap-1">
+                                                    <Calendar size={14} />
+                                                    Deadline: {formatDate(task.deadline)}
                                                 </div>
+                                                {task.opportunity && (
+                                                    <div className="text-[#00D1FF]/80 font-medium">
+                                                        Opportunity: {task.opportunity.title}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className="text-xs font-bold bg-[#6467F2]/10 text-[#9C8BE9] border border-[#6467F2]/25 px-3 py-1.5 rounded-full">
+                                                Submissions: {submittedCount} / {totalAssignments}
+                                            </span>
+                                            {task.rubric && (
+                                                <span className="text-xs font-bold text-[#00D1FF] bg-[#00D1FF]/10 px-3 py-1.5 rounded-full">
+                                                    {task.rubric.title}
+                                                </span>
                                             )}
                                         </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        <span className="text-xs font-bold bg-[#6467F2]/10 text-[#9C8BE9] border border-[#6467F2]/25 px-3 py-1.5 rounded-full">
-                                            Submissions: {submittedCount} / {totalAssignments}
-                                        </span>
-                                        {task.rubric && (
-                                            <span className="text-xs font-bold text-[#00D1FF] bg-[#00D1FF]/10 px-3 py-1.5 rounded-full">
-                                                {task.rubric.title}
-                                            </span>
-                                        )}
-                                    </div>
-                                </motion.div>
-                            </Link>
-                        );
-                    })}
+                                    </motion.div>
+                                </Link>
+                            );
+                        })}
+                    </div>
+
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-center gap-2 pt-4">
+                            <button
+                                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                                disabled={currentPage === 1}
+                                className="px-4 py-2 rounded-xl border border-white/5 bg-[#111827] text-xs font-bold text-gray-400 hover:text-white hover:border-white/10 disabled:opacity-50 transition-all"
+                            >
+                                Prev
+                            </button>
+                            {Array.from({ length: totalPages }).map((_, i) => {
+                                const pageNum = i + 1;
+                                return (
+                                    <button
+                                        key={pageNum}
+                                        onClick={() => setCurrentPage(pageNum)}
+                                        className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${
+                                            currentPage === pageNum
+                                                ? "bg-gradient-to-r from-[#00D1FF] to-[#6467F2] text-white"
+                                                : "border border-white/5 bg-[#111827] text-gray-400 hover:text-white hover:border-white/10"
+                                        }`}
+                                    >
+                                        {pageNum}
+                                    </button>
+                                );
+                            })}
+                            <button
+                                onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                                disabled={currentPage === totalPages}
+                                className="px-4 py-2 rounded-xl border border-white/5 bg-[#111827] text-xs font-bold text-gray-400 hover:text-white hover:border-white/10 disabled:opacity-50 transition-all"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
