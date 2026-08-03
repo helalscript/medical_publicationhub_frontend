@@ -1,8 +1,8 @@
 "use client";
-import React from "react";
+import React, { useState, useRef } from "react";
 import Image from "next/image";
 import { format } from "date-fns";
-import { Paperclip } from "lucide-react";
+import { Paperclip, Play, Pause } from "lucide-react";
 import { Message } from "@/types/chat";
 import { ICurrentUser } from "@/types/auth/auth";
 
@@ -11,6 +11,90 @@ interface MessageItemProps {
   currentUser: ICurrentUser | null;
   isFirstInGroup?: boolean;
 }
+
+const AudioMessagePlayer = ({ url }: { url: string }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play().catch(err => console.error(err));
+      setIsPlaying(true);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration || 0);
+    }
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+  };
+
+  const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (audioRef.current) {
+      const val = parseFloat(e.target.value);
+      audioRef.current.currentTime = val;
+      setCurrentTime(val);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    if (isNaN(seconds) || !isFinite(seconds)) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
+  return (
+    <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl min-w-[240px] max-w-xs border border-white/10 select-none">
+      <audio
+        ref={audioRef}
+        src={url}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleEnded}
+        preload="metadata"
+      />
+      <button
+        onClick={togglePlay}
+        className="w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white transition-all shrink-0 shadow-md shadow-blue-500/20"
+      >
+        {isPlaying ? <Pause size={15} fill="currentColor" /> : <Play size={15} className="ml-0.5" fill="currentColor" />}
+      </button>
+
+      <div className="flex-1 flex flex-col gap-1 min-w-0">
+        <input
+          type="range"
+          min={0}
+          max={duration || 100}
+          value={currentTime}
+          onChange={handleScrub}
+          className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500 focus:outline-none"
+        />
+        <div className="flex items-center justify-between text-[9px] text-gray-400 font-mono">
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const MessageItem = ({ msg, currentUser, isFirstInGroup = true }: MessageItemProps) => {
   const isMe = msg.user_id === currentUser?.id;
@@ -65,6 +149,8 @@ const MessageItem = ({ msg, currentUser, isFirstInGroup = true }: MessageItemPro
                     className="object-cover w-full h-auto hover:opacity-90 transition-opacity"
                   />
                 </a>
+              ) : msg.file.match(/\.(mp3|wav|ogg|webm|m4a|mp4|aac)$/i) || msg.file.toLowerCase().includes("voice-message") ? (
+                <AudioMessagePlayer url={msg.file} />
               ) : (
                 <a 
                   href={msg.file} 

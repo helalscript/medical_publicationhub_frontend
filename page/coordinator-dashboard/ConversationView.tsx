@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Send, User, MessageSquare, Shield, BookOpen, GraduationCap, Loader2 } from "lucide-react";
+import { Send, User, MessageSquare, Shield, BookOpen, GraduationCap, Loader2, Mic, Trash2, Square, Play, Pause } from "lucide-react";
 import { toast } from "sonner";
 import CoordinatorPageHeader from "@/page/coordinator-dashboard/components/CoordinatorPageHeader";
 
@@ -20,6 +20,7 @@ interface IMessage {
   sender: "coordinator" | "other";
   text: string;
   time: string;
+  file?: string;
 }
 
 const INITIAL_CHATS: IChat[] = [
@@ -80,6 +81,180 @@ const INITIAL_MESSAGES: Record<number, IMessage[]> = {
   ]
 };
 
+const AudioMessagePlayer = ({ url }: { url: string }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play().catch(err => console.error(err));
+      setIsPlaying(true);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration || 0);
+    }
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+  };
+
+  const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (audioRef.current) {
+      const val = parseFloat(e.target.value);
+      audioRef.current.currentTime = val;
+      setCurrentTime(val);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    if (isNaN(seconds) || !isFinite(seconds)) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
+  return (
+    <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl min-w-[240px] max-w-xs border border-white/10 select-none">
+      <audio
+        ref={audioRef}
+        src={url}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleEnded}
+        preload="metadata"
+      />
+      <button
+        type="button"
+        onClick={togglePlay}
+        className="w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white transition-all shrink-0 shadow-md shadow-blue-500/20"
+      >
+        {isPlaying ? <Pause size={15} fill="currentColor" /> : <Play size={15} className="ml-0.5" fill="currentColor" />}
+      </button>
+
+      <div className="flex-1 flex flex-col gap-1 min-w-0">
+        <input
+          type="range"
+          min={0}
+          max={duration || 100}
+          value={currentTime}
+          onChange={handleScrub}
+          className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500 focus:outline-none"
+        />
+        <div className="flex items-center justify-between text-[9px] text-gray-400 font-mono">
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const VoicePreviewPlayer = ({ fileUrl, onRemove }: { fileUrl: string; onRemove: () => void }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const audio = new Audio(fileUrl);
+    audioRef.current = audio;
+
+    const handleLoadedMetadata = () => {
+      setDuration(audio.duration || 0);
+    };
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+    };
+
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("ended", handleEnded);
+
+    return () => {
+      audio.pause();
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("ended", handleEnded);
+    };
+  }, [fileUrl]);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play().catch(err => console.error(err));
+      setIsPlaying(true);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
+  return (
+    <div className="flex items-center gap-3 bg-[#1F2937] px-4 py-3 rounded-2xl w-fit min-w-[280px] mb-3 border border-[#00D1FF]/30 shadow-lg">
+      <button 
+        type="button"
+        onClick={togglePlay}
+        className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white hover:bg-blue-500 transition-colors shrink-0"
+      >
+        {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} className="ml-0.5" fill="currentColor" />}
+      </button>
+      
+      <div className="flex-1 flex flex-col gap-1 min-w-0">
+        <span className="text-[11px] font-semibold text-[#00D1FF]">Voice Message Preview</span>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-1.5 bg-gray-700 rounded-full overflow-hidden relative">
+            <div 
+              className="h-full bg-blue-500 transition-all duration-100" 
+              style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+            />
+          </div>
+          <span className="text-[10px] text-gray-400 select-none min-w-[55px] text-right font-mono">
+            {formatTime(currentTime)}
+          </span>
+        </div>
+      </div>
+
+      <button 
+        type="button"
+        onClick={onRemove}
+        className="text-gray-400 hover:text-red-400 p-1.5 hover:bg-white/5 rounded-lg transition-colors shrink-0"
+        title="Discard recording"
+      >
+        <Trash2 size={16} />
+      </button>
+    </div>
+  );
+};
+
 const ConversationView = () => {
   const [chats, setChats] = useState<IChat[]>([]);
   const [activeChatId, setActiveChatId] = useState<number>(1);
@@ -87,6 +262,15 @@ const ConversationView = () => {
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<any>(null);
+  const [recordedFileUrl, setRecordedFileUrl] = useState<string | null>(null);
 
   useEffect(() => {
     // Load chats and messages from localStorage if exist
@@ -114,6 +298,15 @@ const ConversationView = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, activeChatId]);
 
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, []);
+
   const handleSelectChat = (chatId: number) => {
     setActiveChatId(chatId);
     
@@ -124,17 +317,19 @@ const ConversationView = () => {
     });
     setChats(updatedChats);
     localStorage.setItem("coord_chats", JSON.stringify(updatedChats));
+    setRecordedFileUrl(null);
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() && !recordedFileUrl) return;
 
     const newMsg: IMessage = {
       id: Date.now(),
       sender: "coordinator",
       text: inputMessage.trim(),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      ...(recordedFileUrl ? { file: recordedFileUrl } : {})
     };
 
     // Update messages
@@ -148,7 +343,7 @@ const ConversationView = () => {
       if (c.id === activeChatId) {
         return {
           ...c,
-          lastMessage: inputMessage.trim(),
+          lastMessage: recordedFileUrl ? "🎤 Voice message" : inputMessage.trim(),
           time: "Just now"
         };
       }
@@ -158,6 +353,86 @@ const ConversationView = () => {
     localStorage.setItem("coord_chats", JSON.stringify(updatedChats));
 
     setInputMessage("");
+    setRecordedFileUrl(null);
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          const base64data = reader.result as string;
+          setRecordedFileUrl(base64data);
+        };
+        
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        }
+      };
+
+      recorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+
+    } catch (err) {
+      console.error("Microphone access denied or error:", err);
+      alert("Microphone access is required to record voice messages.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.onstop = () => {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        }
+      };
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setRecordedFileUrl(null);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  };
+
+  const formatRecTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
   const activeChat = chats.find(c => c.id === activeChatId);
@@ -286,6 +561,11 @@ const ConversationView = () => {
                           ? "bg-gradient-to-r from-[#2A9D90] to-[#6467F2] text-white rounded-tr-none" 
                           : "bg-[#1F2937]/60 text-gray-200 border border-white/5 rounded-tl-none"
                       }`}>
+                        {msg.file && (
+                          <div className="mb-2">
+                            <AudioMessagePlayer url={msg.file} />
+                          </div>
+                        )}
                         {msg.text}
                       </div>
                       <span className="text-[10px] text-gray-500 font-medium px-1">{msg.time}</span>
@@ -297,22 +577,73 @@ const ConversationView = () => {
             </div>
 
             {/* Chat Input form */}
-            <form onSubmit={handleSendMessage} className="p-4 border-t border-white/5 shrink-0 bg-[#111419]/50 flex gap-3">
-              <input
-                type="text"
-                placeholder={`Send a message to ${activeChat.name}...`}
-                value={inputMessage}
-                onChange={e => setInputMessage(e.target.value)}
-                className="flex-1 px-4 py-3 bg-[#1F2937]/50 border border-white/5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00D1FF]/30 focus:border-[#00D1FF]/50 text-white placeholder:text-gray-500 transition-all"
-              />
-              <button
-                type="submit"
-                className="px-5 py-3 rounded-xl bg-gradient-to-r from-[#2A9D90] to-[#6467F2] text-white hover:opacity-90 active:scale-[0.98] transition-all font-bold shrink-0 flex items-center justify-center gap-1.5"
-              >
-                <Send size={16} />
-                Send
-              </button>
-            </form>
+            <div className="p-4 border-t border-white/5 shrink-0 bg-[#111419]/50 flex flex-col gap-2">
+              {recordedFileUrl && (
+                <VoicePreviewPlayer fileUrl={recordedFileUrl} onRemove={() => setRecordedFileUrl(null)} />
+              )}
+              
+              <form onSubmit={handleSendMessage} className="flex gap-3 relative items-center">
+                {isRecording ? (
+                  <div className="flex-1 bg-[#1F2937] border border-red-500/30 rounded-xl py-3 px-4 flex items-center justify-between text-sm text-white shadow-inner">
+                    <div className="flex items-center gap-3">
+                      <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                      </span>
+                      <span className="text-gray-200 font-medium ml-1">Recording Voice...</span>
+                      <span className="text-red-400 font-semibold font-mono">{formatRecTime(recordingTime)}</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={cancelRecording}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-white/5 transition-colors"
+                        title="Cancel recording"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={stopRecording}
+                        className="p-1.5 bg-red-600 rounded-lg text-white hover:bg-red-500 transition-colors"
+                        title="Stop recording"
+                      >
+                        <Square size={16} fill="currentColor" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      placeholder={`Send a message to ${activeChat.name}...`}
+                      value={inputMessage}
+                      onChange={e => setInputMessage(e.target.value)}
+                      className="flex-1 px-4 py-3 bg-[#1F2937]/50 border border-white/5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00D1FF]/30 focus:border-[#00D1FF]/50 text-white placeholder:text-gray-500 transition-all pr-12"
+                    />
+                    {inputMessage.trim() || recordedFileUrl ? (
+                      <button
+                        type="submit"
+                        className="px-5 py-3 rounded-xl bg-gradient-to-r from-[#2A9D90] to-[#6467F2] text-white hover:opacity-90 active:scale-[0.98] transition-all font-bold shrink-0 flex items-center justify-center gap-1.5"
+                      >
+                        <Send size={16} />
+                        Send
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={startRecording}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-gray-600/30 rounded-lg text-gray-400 hover:text-white hover:bg-blue-600 transition-all"
+                        title="Record voice message"
+                      >
+                        <Mic size={18} />
+                      </button>
+                    )}
+                  </>
+                )}
+              </form>
+            </div>
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-500 gap-3">
