@@ -289,7 +289,7 @@ const Navbar = ({ initialUser, initialSystemInfo }: NavbarProps) => {
                             </button>
 
                             {isProfileOpen && (
-                                <div className="absolute right-0 mt-3 w-60 bg-[#1F242D] border border-white/10 rounded-2xl shadow-2xl py-3 z-[60] animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="absolute right-0 mt-3 w-60 bg-[#1F242D] border border-white/10 rounded-2xl shadow-2xl py-3 z-[999] animate-in fade-in slide-in-from-top-2 duration-200 ">
                                     <div className="px-4 py-3 border-b border-white/5 mb-2">
                                         <p className="text-xs text-gray-400 mb-0.5">Signed in as</p>
                                         <p className="text-sm font-bold text-white truncate">{user.email}</p>
@@ -314,12 +314,14 @@ const Navbar = ({ initialUser, initialSystemInfo }: NavbarProps) => {
                         </Link>
                     )}
 
-                    <Link href="/register">
-                        <CTAButton className="whitespace-nowrap px-4 py-2.5 text-sm 2xl:px-7 2xl:py-3 2xl:text-base">
-                            <span className="2xl:hidden">Join mentor</span>
-                            <span className="hidden 2xl:inline">Join as a mentor</span>
-                        </CTAButton>
-                    </Link>
+                    {!user && (
+                        <Link href="/register">
+                            <CTAButton className="whitespace-nowrap px-4 py-2.5 text-sm 2xl:px-7 2xl:py-3 2xl:text-base">
+                                <span className="2xl:hidden">Join mentor</span>
+                                <span className="hidden 2xl:inline">Join as a mentor</span>
+                            </CTAButton>
+                        </Link>
+                    )}
                 </div>
 
                 {/* Tablet/Mobile Toggle */}
@@ -405,11 +407,13 @@ const Navbar = ({ initialUser, initialSystemInfo }: NavbarProps) => {
                                 Sign In
                             </Link>
                         )}
-                        <Link href="/register" onClick={() => setIsOpen(false)}>
-                            <CTAButton className="w-full py-4">
-                                Join as a mentor
-                            </CTAButton>
-                        </Link>
+                        {!user && (
+                            <Link href="/register" onClick={() => setIsOpen(false)}>
+                                <CTAButton className="w-full py-4">
+                                    Join as a mentor
+                                </CTAButton>
+                            </Link>
+                        )}
                     </div>
                 </div>
             </div>

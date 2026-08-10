@@ -12,6 +12,7 @@ export interface Rubric {
     description?: string;
     criteria: RubricCriterion[];
     is_global?: boolean;
+    user_id?: number;
     created_at?: string;
 }
 

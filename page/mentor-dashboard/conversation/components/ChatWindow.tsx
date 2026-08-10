@@ -98,7 +98,7 @@ const ChatWindow = ({
   return (
     <div className="flex-1 bg-[#0B0F1A] border border-white/5 rounded-3xl flex flex-col h-full overflow-hidden shadow-2xl relative border-t-white/10">
       {/* Chat Header - Fixed at top with explicit height and flex properties */}
-      <div className="h-20 shrink-0 px-6 border-b border-white/5 flex items-center justify-between bg-[#111827]/80 backdrop-blur-2xl z-30">
+      <div className="h-20 shrink-0 px-6 border-b border-white/5 flex items-center justify-between bg-[#111827]/80 backdrop-blur-2xl z-10">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#1F2937] to-[#111827] text-blue-400 flex items-center justify-center border border-white/10 overflow-hidden relative shadow-lg">
             {activeConv.chatable?.thumbnail ? (

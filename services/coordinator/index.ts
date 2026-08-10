@@ -106,3 +106,56 @@ export const exportCoordinatorAnalytics = async (params?: {
     });
     return response;
 };
+
+export const getCoordinatorChats = async (page = 1, perPage = 10) => {
+    try {
+        const response = await fetch(
+            `${base()}/coordinator/chats?per_page=${perPage}&page=${page}`,
+            { method: "GET", headers: await getAuthHeaders(), cache: "no-store" }
+        );
+        return await response.json();
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const getCoordinatorChatMessages = async (chatId: string | number, page = 1, perPage = 10) => {
+    try {
+        const response = await fetch(
+            `${base()}/coordinator/chats/${chatId}?per_page=${perPage}&page=${page}`,
+            { method: "GET", headers: await getAuthHeaders(), cache: "no-store" }
+        );
+        return await response.json();
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const sendCoordinatorChatMessage = async (chatId: string | number, message: string, file?: File) => {
+    const { cookies } = await import("next/headers");
+    const token = (await cookies()).get("token")?.value;
+    if (!token) return { status: false, message: "Authentication token missing." };
+
+    const formData = new FormData();
+    formData.append("chat_id", chatId.toString());
+    if (message?.trim()) formData.append("message", message);
+    if (file) formData.append("file", file);
+
+    try {
+        const response = await fetch(
+            `${base()}/coordinator/chats/${chatId}/messages`,
+            {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+                body: formData,
+            }
+        );
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => null);
+            return { status: false, message: errorData?.message || "Failed to send message" };
+        }
+        return await response.json();
+    } catch (error) {
+        return { status: false, message: error instanceof Error ? error.message : "Failed to send message" };
+    }
+};

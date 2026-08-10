@@ -8,6 +8,8 @@ import CoordinatorPageHeader from "@/page/coordinator-dashboard/components/Coord
 import RubricCriteriaEditor from "@/page/shared/assessment/RubricCriteriaEditor";
 import { extractList, isApiSuccess } from "@/page/shared/assessment/utils";
 import type { Rubric, RubricCriterion } from "@/types/assessment";
+import { getCurrentUser } from "@/services/auth";
+import type { ICurrentUser } from "@/types/auth/auth";
 
 type RubricApi = {
     getRubrics: () => Promise<unknown>;
@@ -35,6 +37,7 @@ const RubricsView = ({ api, portalLabel = "Assessment", isGlobal = false }: Rubr
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<Rubric | null>(null);
     const [form, setForm] = useState(emptyForm());
+    const [currentUser, setCurrentUser] = useState<ICurrentUser | null>(null);
 
     const load = async () => {
         setLoading(true);
@@ -50,6 +53,7 @@ const RubricsView = ({ api, portalLabel = "Assessment", isGlobal = false }: Rubr
 
     useEffect(() => {
         load();
+        getCurrentUser().then(setCurrentUser).catch(console.error);
     }, []);
 
     const openCreate = () => {
@@ -201,20 +205,22 @@ const RubricsView = ({ api, portalLabel = "Assessment", isGlobal = false }: Rubr
                                         </span>
                                     ) : null}
                                 </div>
-                                <div className="flex gap-1">
-                                    <button
-                                        onClick={() => openEdit(rubric)}
-                                        className="p-2 rounded-lg text-[#A3A7AE] hover:text-[#00D1FF] hover:bg-[#00D1FF]/10 transition-colors"
-                                    >
-                                        <Pencil size={16} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(rubric.id)}
-                                        className="p-2 rounded-lg text-[#A3A7AE] hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
+                                {rubric.user_id === currentUser?.id && (
+                                    <div className="flex gap-1">
+                                        <button
+                                            onClick={() => openEdit(rubric)}
+                                            className="p-2 rounded-lg text-[#A3A7AE] hover:text-[#00D1FF] hover:bg-[#00D1FF]/10 transition-colors"
+                                        >
+                                            <Pencil size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(rubric.id)}
+                                            className="p-2 rounded-lg text-[#A3A7AE] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                             {rubric.description && (
                                 <p className="text-[#A3A7AE] text-sm mb-4 line-clamp-2">{rubric.description}</p>
